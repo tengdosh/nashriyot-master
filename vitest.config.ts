@@ -17,6 +17,11 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       include: ["lib/**/*.ts"],
       exclude: ["lib/generated/**", "lib/**/*.{test,spec}.ts", "**/*.d.ts"],
+      // Pure engines require 100% coverage (spec). Enforced per-file so the
+      // suite fails if finance.ts (and later costing/royalty) regress.
+      thresholds: {
+        "lib/finance.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+      },
     },
   },
 });
