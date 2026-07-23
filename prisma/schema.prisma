@@ -1,6 +1,13 @@
-// Nashriyot-Master — Prisma schema.
-// The full data model (v1 §3.2 core + v2 §4 delta) is built in Task 2.
-// This Task 1 skeleton defines only the generator + PostgreSQL datasource.
+// Nashriyot-Master — Prisma schema
+// Core: docs/spec.md v1 §3.2. Delta: v2 §4 (entities, partners, editions,
+// cost_entries, daily_unit_cost, transfer_orders, discount_rules, leads,
+// payables, payments, telegram_links; warehouse/contract/print/sales changes).
+//
+// Conventions:
+//   - Money = Decimal(18,2). Rates/ratios = Decimal(6,4). FX rate = Decimal(14,4).
+//   - Every table: id (cuid), createdAt, updatedAt. Master tables: archivedAt (soft delete).
+//   - Statuses are enums. Sealed fields are marked "SEALED" in comments.
+//   - titles.searchVector (tsvector) is added in Task 5 (⌘K search) to keep this migration portable.
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +16,1160 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────────
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum EntityType {
+  PUBLISHER
+  DISTRIBUTOR
+}
+
+enum PartnerRole {
+  CLIENT
+  AGENT
+  PRINTER
+  EXT_PUBLISHER
+  SUPPLIER
+}
+
+enum WarehouseType {
+  MAIN
+  SALES
+  AGENT
+}
+
+enum TitleStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  ACTIVE
+  OUT_OF_PRINT
+}
+
+enum OwnerType {
+  OWN
+  EXTERNAL
+}
+
+enum EditionStatus {
+  PLANNED
+  IN_PRODUCTION
+  ACTIVE
+  OUT_OF_PRINT
+}
+
+enum ProductFormat {
+  HARDCOVER
+  PAPERBACK
+  EBOOK
+  AUDIO
+}
+
+enum ContributorRole {
+  AUTHOR
+  CO_AUTHOR
+  TRANSLATOR
+  EDITOR
+  ILLUSTRATOR
+  DESIGNER
+  NARRATOR
+  OTHER
+}
+
+enum Currency {
+  UZS
+  USD
+  TRY
+  EUR
+}
+
+enum CostScope {
+  TITLE
+  EDITION
+  FIXED
+}
+
+enum CostCategory {
+  HUQUQ // rights
+  TARJIMA // translation
+  TAHRIR // editing
+  DIZAYN // design
+  MUALLIF_BUYOUT // author buyout
+  BOSMA // printing
+  MARKETING_TITLE
+  MARKETING_BRAND
+  IJARA // rent
+  OYLIK // salary
+  KOMMUNAL // utilities
+  BOSHQA // other
+}
+
+enum PrintOrderStatus {
+  REQUESTED // SO'ROV
+  APPROVED // TASDIQLANGAN
+  PRINTING // BOSILMOQDA
+  RECEIVED // QABUL
+}
+
+enum TaskStatus {
+  PLANNED // Reja
+  IN_PROGRESS // Jarayonda
+  IN_REVIEW // Tekshiruvda
+  DONE // Tayyor
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  TRANSFER
+  ADJUST
+  RETURN
+}
+
+enum SalesChannelType {
+  RETAIL
+  MARKETPLACE
+  DISTRIBUTOR
+  OWN_STORE
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  SHIPPED
+  INVOICED
+  PAID
+  CANCELLED
+}
+
+enum ReturnCondition {
+  SELLABLE
+  DAMAGED
+}
+
+enum TransferOrderStatus {
+  DRAFT // QORALAMA
+  SHIPPED // JO'NATILDI
+  RECEIVED // QABUL
+}
+
+enum DiscountScope {
+  PARTNER
+  VOLUME
+  TITLE
+  ENTITY
+  DEFAULT
+}
+
+enum LeadSource {
+  INSTAGRAM
+  TELEGRAM
+  FACEBOOK
+  REFERRAL
+  WALK_IN
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  ORDERED
+  LOST
+}
+
+enum LostReason {
+  PRICE
+  AVAILABILITY
+  COMPETITOR
+  NO_RESPONSE
+  OTHER
+}
+
+enum ContractType {
+  BUYOUT
+  ROYALTY
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum RoyaltyBasis {
+  LIST
+  NET
+}
+
+enum RoyaltyRunStatus {
+  DRAFT
+  APPROVED
+  SENT
+}
+
+enum PayableType {
+  COMMISSION_BOOKS
+  PRINTING
+  RIGHTS
+  OTHER
+}
+
+enum PayableStatus {
+  OPEN
+  PARTIAL
+  PAID
+}
+
+enum PaymentDirection {
+  IN
+  OUT
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK
+}
+
+enum ReconStatus {
+  PENDING
+  MATCHED
+}
+
+enum ForecastMethod {
+  MOVING_AVERAGE
+  LINEAR_REGRESSION
+  PROPHET
+  XGBOOST
+  ENSEMBLE
+  COLDSTART
+}
+
+enum PriceRecStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum NotificationType {
+  ROP
+  DEAD_STOCK
+  BREAK_EVEN
+  CREDIT_LIMIT
+  AR_OVERDUE
+  VARIANCE
+  ROYALTY_APPROVAL
+  RECON_MISMATCH
+  GENERAL
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RBAC & audit
+// ─────────────────────────────────────────────────────────────────────────────
+model User {
+  id            String  @id @default(cuid())
+  email         String  @unique
+  passwordHash  String
+  fullName      String
+  isActive      Boolean @default(true)
+  contributorId String? @unique
+
+  contributor         Contributor?     @relation(fields: [contributorId], references: [id])
+  roles               UserRole[]
+  entityAccess        Entity[]         @relation("UserEntityAccess")
+  auditLogs           AuditLog[]
+  royaltyRunsCreated  RoyaltyRun[]     @relation("RoyaltyRunCreatedBy")
+  royaltyRunsApproved RoyaltyRun[]     @relation("RoyaltyRunApprovedBy")
+  assignedTasks       ProductionTask[] @relation("TaskAssignee")
+  leads               Lead[]           @relation("LeadAssignee")
+  telegramLink        TelegramLink?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([contributorId])
+}
+
+model Role {
+  id       String  @id @default(cuid())
+  code     String  @unique // DIRECTOR, SALES_MANAGER, ...
+  name     String
+  isSystem Boolean @default(false) // 9 standard locked roles
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Permission {
+  id     String @id @default(cuid())
+  code   String @unique // 'inventory.write'
+  module String
+
+  roles RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([roleId])
+}
+
+model AuditLog {
+  id       String      @id @default(cuid())
+  userId   String?
+  action   AuditAction
+  entity   String // table name
+  entityId String
+  before   Json?
+  after    Json?
+
+  user User? @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Organisation: entities, partners, warehouses
+// ─────────────────────────────────────────────────────────────────────────────
+model Entity {
+  id   String     @id @default(cuid())
+  code String     @unique // TASNIM / TAHLIL / SOTUV_BOLIMI
+  name String
+  type EntityType
+
+  usersWithAccess User[]          @relation("UserEntityAccess")
+  warehouses      Warehouse[]
+  costEntries     CostEntry[]
+  salesOrders     SalesOrder[]
+  payments        Payment[]
+  transfersFrom   TransferOrder[] @relation("TransferFrom")
+  transfersTo     TransferOrder[] @relation("TransferTo")
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+}
+
+model Partner {
+  id              String        @id @default(cuid())
+  name            String
+  roles           PartnerRole[] // CLIENT/AGENT/PRINTER/EXT_PUBLISHER/SUPPLIER
+  defaultDiscount Decimal?      @db.Decimal(6, 4)
+  creditLimit     Decimal?      @db.Decimal(18, 2)
+  paymentTermDays Int?
+  currency        Currency      @default(UZS)
+  isBlocked       Boolean       @default(false)
+  contact         String?
+
+  agentWarehouses Warehouse[]  @relation("AgentWarehouse")
+  ownedTitles     Title[]      @relation("TitleOwner")
+  printOrders     PrintOrder[]
+  salesOrders     SalesOrder[]
+  payables        Payable[]
+  payments        Payment[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([isBlocked])
+}
+
+model Warehouse {
+  id        String        @id @default(cuid())
+  name      String
+  location  String?
+  entityId  String
+  type      WarehouseType
+  partnerId String? // set for AGENT warehouses
+
+  entity         Entity          @relation(fields: [entityId], references: [id])
+  partner        Partner?        @relation("AgentWarehouse", fields: [partnerId], references: [id])
+  inventoryItems InventoryItem[]
+  movements      StockMovement[]
+  salesOrders    SalesOrder[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([entityId])
+  @@index([type])
+  @@index([partnerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catalog: series, titles, editions, products, contributors, ONIX
+// ─────────────────────────────────────────────────────────────────────────────
+model Series {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+
+  titles Title[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Title {
+  id             String      @id @default(cuid())
+  workTitle      String
+  status         TitleStatus @default(DRAFT)
+  ownerType      OwnerType   @default(OWN)
+  ownerPartnerId String? // for EXTERNAL: owning external publisher
+  language       String      @default("uz")
+  seriesId       String?
+  description    String?
+  keywords       String[]
+  themaCodes     String[]
+  bisacCodes     String[]
+
+  ownerPartner    Partner?           @relation("TitleOwner", fields: [ownerPartnerId], references: [id])
+  series          Series?            @relation(fields: [seriesId], references: [id])
+  editions        Edition[]
+  products        Product[]
+  contributors    TitleContributor[]
+  costEntries     CostEntry[]
+  contracts       Contract[]
+  productionTasks ProductionTask[]
+  leads           Lead[]             @relation("LeadInterest")
+  plScenarios     PlScenario[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([status])
+  @@index([seriesId])
+  @@index([ownerType])
+}
+
+model Edition {
+  id         String        @id @default(cuid())
+  titleId    String
+  editionNo  Int
+  plannedRun Int
+  status     EditionStatus @default(PLANNED)
+  notes      String?
+
+  title       Title        @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  products    Product[]
+  printOrders PrintOrder[]
+  costEntries CostEntry[]
+  plScenarios PlScenario[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@unique([titleId, editionNo])
+  @@index([titleId])
+  @@index([status])
+}
+
+model Product {
+  id        String        @id @default(cuid())
+  titleId   String
+  editionId String?
+  format    ProductFormat
+  isbn13    String?       @unique
+  sku       String?       @unique
+  pages     Int?
+  listPrice Decimal       @db.Decimal(18, 2)
+  vatRate   Decimal       @default(0) @db.Decimal(6, 4)
+
+  title                Title                 @relation(fields: [titleId], references: [id])
+  edition              Edition?              @relation(fields: [editionId], references: [id])
+  inventoryItems       InventoryItem[]
+  movements            StockMovement[]
+  printOrders          PrintOrder[]
+  salesOrderLines      SalesOrderLine[]
+  transferOrderLines   TransferOrderLine[]
+  onixExports          OnixExport[]
+  forecasts            Forecast[]
+  priceRecommendations PriceRecommendation[]
+  reorderRule          ReorderRule?
+  dailyUnitCosts       DailyUnitCost[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([titleId])
+  @@index([editionId])
+  @@index([format])
+}
+
+model Contributor {
+  id       String          @id @default(cuid())
+  fullName String
+  role     ContributorRole @default(AUTHOR)
+  bio      String?
+
+  titles    TitleContributor[]
+  contracts Contract[]
+  user      User?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+}
+
+model TitleContributor {
+  id            String          @id @default(cuid())
+  titleId       String
+  contributorId String
+  role          ContributorRole
+  shareRate     Decimal?        @db.Decimal(6, 4)
+
+  title       Title       @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  contributor Contributor @relation(fields: [contributorId], references: [id])
+
+  @@unique([titleId, contributorId, role])
+  @@index([contributorId])
+}
+
+model OnixExport {
+  id        String  @id @default(cuid())
+  productId String
+  version   String
+  xml       String
+  channel   String?
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Costing (M3/M12)
+// ─────────────────────────────────────────────────────────────────────────────
+model CostEntry {
+  id        String       @id @default(cuid())
+  scope     CostScope
+  category  CostCategory
+  entityId  String?
+  titleId   String?
+  editionId String?
+  amount    Decimal      @db.Decimal(18, 2)
+  currency  Currency     @default(UZS)
+  rate      Decimal      @default(1) @db.Decimal(14, 4) // to UZS
+  amountUZS Decimal      @db.Decimal(18, 2)
+  date      DateTime
+  campaign  String?
+
+  entity  Entity?  @relation(fields: [entityId], references: [id])
+  title   Title?   @relation(fields: [titleId], references: [id])
+  edition Edition? @relation(fields: [editionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope])
+  @@index([category])
+  @@index([entityId])
+  @@index([titleId])
+  @@index([editionId])
+  @@index([date])
+  @@index([campaign])
+}
+
+model DailyUnitCost {
+  id            String   @id @default(cuid())
+  productId     String
+  editionId     String?
+  date          DateTime @db.Date
+  baseUnit      Decimal  @db.Decimal(18, 2) // print unit (FIFO)
+  allocFixedCum Decimal  @db.Decimal(18, 2)
+  reportCost    Decimal  @db.Decimal(18, 2)
+  decisionCost  Decimal  @db.Decimal(18, 2)
+  expNetPrice   Decimal  @db.Decimal(18, 2)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, date])
+  @@index([date])
+}
+
+model PlScenario {
+  id              String  @id @default(cuid())
+  titleId         String?
+  editionId       String?
+  name            String
+  fixedCosts      Json // [{label, amount}]
+  pagesCount      Int
+  perPageCost     Decimal @db.Decimal(18, 2)
+  fixedPrintCost  Decimal @db.Decimal(18, 2)
+  printRun        Int
+  sellThroughRate Decimal @db.Decimal(6, 4)
+  discountRate    Decimal @db.Decimal(6, 4)
+  royaltyRate     Decimal @db.Decimal(6, 4)
+  targetMargin    Decimal @db.Decimal(6, 4)
+  results         Json? // cached PC/TC/UC/Pmin/RRP
+
+  title   Title?   @relation(fields: [titleId], references: [id])
+  edition Edition? @relation(fields: [editionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([titleId])
+  @@index([editionId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Production & inventory (M4/M5)
+// ─────────────────────────────────────────────────────────────────────────────
+model PrintOrder {
+  id           String           @id @default(cuid())
+  editionId    String?
+  productId    String
+  printerId    String
+  quantity     Int
+  unitPPB      Decimal          @db.Decimal(18, 2) // per-copy print cost (currency)
+  fixedCost    Decimal          @default(0) @db.Decimal(18, 2)
+  currency     Currency         @default(UZS)
+  rate         Decimal          @default(1) @db.Decimal(14, 4)
+  status       PrintOrderStatus @default(REQUESTED)
+  expectedDate DateTime?
+  receivedQty  Int?
+  receivedDate DateTime?
+
+  edition Edition? @relation(fields: [editionId], references: [id])
+  product Product  @relation(fields: [productId], references: [id])
+  printer Partner  @relation(fields: [printerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([editionId])
+  @@index([productId])
+  @@index([printerId])
+  @@index([status])
+}
+
+model ProductionTask {
+  id          String     @id @default(cuid())
+  titleId     String
+  name        String
+  assigneeId  String?
+  startDate   DateTime?
+  dueDate     DateTime?
+  status      TaskStatus @default(PLANNED)
+  dependsOnId String?
+
+  title      Title            @relation(fields: [titleId], references: [id])
+  assignee   User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  dependsOn  ProductionTask?  @relation("TaskDeps", fields: [dependsOnId], references: [id])
+  dependents ProductionTask[] @relation("TaskDeps")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([titleId])
+  @@index([status])
+  @@index([assigneeId])
+}
+
+model InventoryItem {
+  id          String @id @default(cuid())
+  productId   String
+  warehouseId String
+  qtyOnHand   Int    @default(0)
+  qtyReserved Int    @default(0)
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
+}
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  productId    String
+  warehouseId  String
+  type         StockMovementType
+  qty          Int
+  unitCost     Decimal?          @db.Decimal(18, 2) // FIFO layer cost for IN rows
+  qtyRemaining Int? // remaining units in this IN layer (FIFO consumption)
+  refType      String?
+  refId        String?
+  reason       String?
+  date         DateTime          @default(now())
+
+  product   Product   @relation(fields: [productId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, warehouseId])
+  @@index([type])
+  @@index([date])
+  @@index([refType, refId])
+}
+
+model ReorderRule {
+  id            String  @id @default(cuid())
+  productId     String  @unique
+  leadTimeDays  Int     @default(30)
+  serviceLevelZ Decimal @default(1.65) @db.Decimal(4, 2)
+  manualROP     Int?
+  isAuto        Boolean @default(true)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sales, transfers, discounts (M6/M13)
+// ─────────────────────────────────────────────────────────────────────────────
+model SalesChannel {
+  id              String           @id @default(cuid())
+  name            String
+  type            SalesChannelType
+  defaultDiscount Decimal          @db.Decimal(6, 4)
+  feeRate         Decimal          @default(0) @db.Decimal(6, 4)
+  paymentTermDays Int              @default(0)
+
+  orders SalesOrder[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([type])
+}
+
+model SalesOrder {
+  id                String           @id @default(cuid())
+  channelId         String
+  entityId          String
+  warehouseId       String
+  partnerId         String?
+  customerName      String?
+  status            SalesOrderStatus @default(DRAFT)
+  orderDate         DateTime         @default(now())
+  dueDate           DateTime?
+  shippedDate       DateTime?
+  invoicedDate      DateTime?
+  paidDate          DateTime?
+  deliveryProvider  String?
+  deliveryCostTotal Decimal?         @db.Decimal(18, 2)
+
+  channel           SalesChannel     @relation(fields: [channelId], references: [id])
+  entity            Entity           @relation(fields: [entityId], references: [id])
+  warehouse         Warehouse        @relation(fields: [warehouseId], references: [id])
+  partner           Partner?         @relation(fields: [partnerId], references: [id])
+  lines             SalesOrderLine[]
+  convertedFromLead Lead?            @relation("LeadConverted")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([channelId])
+  @@index([entityId])
+  @@index([warehouseId])
+  @@index([partnerId])
+  @@index([status])
+  @@index([orderDate])
+}
+
+model SalesOrderLine {
+  id               String   @id @default(cuid())
+  orderId          String
+  productId        String
+  qty              Int
+  unitPrice        Decimal  @db.Decimal(18, 2)
+  discountRate     Decimal  @default(0) @db.Decimal(6, 4) // SEALED at save
+  cogsUnit         Decimal? @db.Decimal(18, 2) // SEALED at ship
+  cmUnit           Decimal? @db.Decimal(18, 2) // SEALED at ship
+  deliveryCostUnit Decimal? @db.Decimal(18, 2)
+
+  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product    @relation(fields: [productId], references: [id])
+  returns Return[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Return {
+  id          String          @id @default(cuid())
+  orderLineId String
+  qty         Int
+  condition   ReturnCondition
+  date        DateTime        @default(now())
+
+  orderLine SalesOrderLine @relation(fields: [orderLineId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([orderLineId])
+  @@index([date])
+}
+
+model TransferOrder {
+  id           String              @id @default(cuid())
+  fromEntityId String
+  toEntityId   String
+  status       TransferOrderStatus @default(DRAFT)
+  date         DateTime            @default(now())
+  shippedDate  DateTime?
+  receivedDate DateTime?
+
+  fromEntity Entity              @relation("TransferFrom", fields: [fromEntityId], references: [id])
+  toEntity   Entity              @relation("TransferTo", fields: [toEntityId], references: [id])
+  lines      TransferOrderLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fromEntityId])
+  @@index([toEntityId])
+  @@index([status])
+}
+
+model TransferOrderLine {
+  id              String  @id @default(cuid())
+  transferOrderId String
+  productId       String
+  qty             Int
+  basePrice       Decimal @db.Decimal(18, 2)
+  discountRate    Decimal @default(0) @db.Decimal(6, 4) // SEALED
+  transferPrice   Decimal @db.Decimal(18, 2)
+
+  transferOrder TransferOrder @relation(fields: [transferOrderId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([transferOrderId])
+  @@index([productId])
+}
+
+model DiscountRule {
+  id       String        @id @default(cuid())
+  scope    DiscountScope
+  refId    String? // partnerId / titleId / entityId depending on scope
+  minQty   Int?
+  rate     Decimal       @db.Decimal(6, 4)
+  priority Int           @default(0)
+  isActive Boolean       @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope])
+  @@index([refId])
+  @@index([priority])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRM (M14)
+// ─────────────────────────────────────────────────────────────────────────────
+model Lead {
+  id               String      @id @default(cuid())
+  source           LeadSource
+  campaign         String?
+  contact          String
+  interestTitleId  String?
+  status           LeadStatus  @default(NEW)
+  assigneeId       String?
+  convertedOrderId String?     @unique
+  lostReason       LostReason?
+  lastContactAt    DateTime?
+  notes            Json? // [{at, text}]
+
+  interestTitle  Title?      @relation("LeadInterest", fields: [interestTitleId], references: [id])
+  assignee       User?       @relation("LeadAssignee", fields: [assigneeId], references: [id])
+  convertedOrder SalesOrder? @relation("LeadConverted", fields: [convertedOrderId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([source])
+  @@index([campaign])
+  @@index([assigneeId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rights & royalties (M7)
+// ─────────────────────────────────────────────────────────────────────────────
+model Contract {
+  id            String         @id @default(cuid())
+  contributorId String
+  titleId       String?
+  type          ContractType
+  advanceAmount Decimal        @default(0) @db.Decimal(18, 2)
+  reserveRate   Decimal        @default(0) @db.Decimal(6, 4)
+  buyoutAmount  Decimal?       @db.Decimal(18, 2)
+  audioRights   Boolean        @default(false)
+  status        ContractStatus @default(DRAFT)
+
+  contributor Contributor        @relation(fields: [contributorId], references: [id])
+  title       Title?             @relation(fields: [titleId], references: [id])
+  tiers       RoyaltyTier[]
+  statements  RoyaltyStatement[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  @@index([contributorId])
+  @@index([titleId])
+  @@index([type])
+  @@index([status])
+}
+
+model RoyaltyTier {
+  id         String         @id @default(cuid())
+  contractId String
+  format     ProductFormat?
+  fromUnits  Int
+  toUnits    Int?
+  rate       Decimal        @db.Decimal(6, 4)
+  basis      RoyaltyBasis   @default(LIST)
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([contractId])
+}
+
+model RoyaltyRun {
+  id           String           @id @default(cuid())
+  period       String           @unique // "2025-H1"
+  status       RoyaltyRunStatus @default(DRAFT)
+  createdById  String?
+  approvedById String?
+  approvedAt   DateTime?
+
+  createdBy  User?              @relation("RoyaltyRunCreatedBy", fields: [createdById], references: [id])
+  approvedBy User?              @relation("RoyaltyRunApprovedBy", fields: [approvedById], references: [id])
+  statements RoyaltyStatement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model RoyaltyStatement {
+  id              String  @id @default(cuid())
+  runId           String
+  contractId      String
+  earned          Decimal @db.Decimal(18, 2)
+  reserveHeld     Decimal @db.Decimal(18, 2)
+  advanceRecouped Decimal @db.Decimal(18, 2)
+  payable         Decimal @db.Decimal(18, 2)
+  unitsSold       Int     @default(0)
+  detail          Json? // per-tier breakdown
+  pdfPath         String?
+
+  run      RoyaltyRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  contract Contract   @relation(fields: [contractId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@index([contractId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Finance (M15)
+// ─────────────────────────────────────────────────────────────────────────────
+model Payable {
+  id        String        @id @default(cuid())
+  partnerId String
+  type      PayableType
+  amount    Decimal       @db.Decimal(18, 2)
+  currency  Currency      @default(UZS)
+  rate      Decimal       @default(1) @db.Decimal(14, 4)
+  amountUZS Decimal       @db.Decimal(18, 2)
+  dueDate   DateTime?
+  status    PayableStatus @default(OPEN)
+  refType   String?
+  refId     String?
+
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partnerId])
+  @@index([type])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Payment {
+  id          String           @id @default(cuid())
+  direction   PaymentDirection
+  method      PaymentMethod
+  entityId    String
+  partnerId   String?
+  amount      Decimal          @db.Decimal(18, 2)
+  currency    Currency         @default(UZS)
+  reconStatus ReconStatus      @default(PENDING)
+  bankRef     String?
+  refType     String? // SalesOrder (AR) or Payable (AP) or internal transfer
+  refId       String?
+  date        DateTime         @default(now())
+
+  entity  Entity   @relation(fields: [entityId], references: [id])
+  partner Partner? @relation(fields: [partnerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([direction])
+  @@index([entityId])
+  @@index([partnerId])
+  @@index([reconStatus])
+  @@index([date])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI / forecasting (M10/M18)
+// ─────────────────────────────────────────────────────────────────────────────
+model Forecast {
+  id            String         @id @default(cuid())
+  productId     String
+  method        ForecastMethod
+  horizonMonths Int
+  values        Json
+  low           Json?
+  high          Json?
+  mape          Decimal?       @db.Decimal(6, 4)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model PriceRecommendation {
+  id             String         @id @default(cuid())
+  productId      String
+  currentPrice   Decimal        @db.Decimal(18, 2)
+  suggestedPrice Decimal        @db.Decimal(18, 2)
+  floorPrice     Decimal        @db.Decimal(18, 2)
+  rationale      String?
+  status         PriceRecStatus @default(PENDING)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// System: notifications, settings, telegram links
+// ─────────────────────────────────────────────────────────────────────────────
+model Notification {
+  id         String               @id @default(cuid())
+  type       NotificationType
+  severity   NotificationSeverity @default(INFO)
+  title      String
+  body       String?
+  linkUrl    String?
+  entityId   String?
+  targetRole String? // role code to fan out to
+  refType    String?
+  refId      String?
+  isRead     Boolean              @default(false)
+  readAt     DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([isRead])
+  @@index([targetRole])
+  @@index([createdAt])
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TelegramLink {
+  id            String @id @default(cuid())
+  chatId        String @unique
+  userId        String @unique
+  subscriptions Json? // {daily, weekly, events[]}
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  linkedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

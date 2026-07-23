@@ -76,7 +76,146 @@ tests/unit, tests/e2e/   # Vitest, Playwright
 docs/              # spec.md, demo-data.md, playbook.md
 ```
 
+## Maʼlumotlar bazasi (ER diagramma)
+
+Sxema: [prisma/schema.prisma](prisma/schema.prisma) — 40 model, ~34 enum
+(v1 §3.2 yadro + v2 §4 delta). Pul = `Decimal(18,2)`, nisbatlar = `Decimal(6,4)`,
+valyuta kursi = `Decimal(14,4)`. Muhrlanadigan (SEALED) maydonlar izohlarda
+belgilangan. Migratsiya: `npm run db:migrate`, seed: `npm run db:seed`.
+
+```mermaid
+erDiagram
+  Entity ||--o{ Warehouse : owns
+  Entity ||--o{ CostEntry : "fixed costs"
+  Entity ||--o{ SalesOrder : sells
+  Entity ||--o{ Payment : cashbook
+  Entity ||--o{ TransferOrder : "from"
+  Entity ||--o{ TransferOrder : "to"
+  Partner ||--o{ Warehouse : "agent stock"
+  Partner ||--o{ Title : "owns (external)"
+  Partner ||--o{ PrintOrder : printer
+  Partner ||--o{ SalesOrder : client
+  Partner ||--o{ Payable : owed
+  Partner ||--o{ Payment : counterparty
+
+  User ||--o{ UserRole : has
+  Role ||--o{ UserRole : grants
+  Role ||--o{ RolePermission : has
+  Permission ||--o{ RolePermission : in
+  User ||--o{ AuditLog : writes
+  Contributor ||--o| User : "portal login"
+  User }o--o{ Entity : entityAccess
+
+  Series ||--o{ Title : contains
+  Title ||--o{ Edition : editions
+  Title ||--o{ Product : SKUs
+  Title ||--o{ TitleContributor : credits
+  Title ||--o{ CostEntry : "unique costs"
+  Title ||--o{ Contract : contracts
+  Title ||--o{ ProductionTask : tasks
+  Title ||--o{ Lead : interest
+  Title ||--o{ PlScenario : scenarios
+  Edition ||--o{ Product : SKUs
+  Edition ||--o{ PrintOrder : "print runs"
+  Edition ||--o{ CostEntry : "print costs"
+  Edition ||--o{ PlScenario : scenarios
+  Contributor ||--o{ TitleContributor : credited
+  Contributor ||--o{ Contract : party
+
+  Product ||--o{ InventoryItem : "on hand"
+  Product ||--o{ StockMovement : moves
+  Product ||--o{ PrintOrder : printed
+  Product ||--o{ SalesOrderLine : sold
+  Product ||--o{ TransferOrderLine : transferred
+  Product ||--o{ OnixExport : onix
+  Product ||--o{ Forecast : forecasts
+  Product ||--o{ PriceRecommendation : pricing
+  Product ||--o| ReorderRule : reorder
+  Product ||--o{ DailyUnitCost : costing
+
+  Warehouse ||--o{ InventoryItem : holds
+  Warehouse ||--o{ StockMovement : ledger
+  Warehouse ||--o{ SalesOrder : ships
+  User ||--o{ ProductionTask : assignee
+  ProductionTask ||--o{ ProductionTask : dependsOn
+
+  SalesChannel ||--o{ SalesOrder : channel
+  SalesOrder ||--o{ SalesOrderLine : lines
+  SalesOrderLine ||--o{ Return : returns
+  SalesOrder ||--o| Lead : "converted from"
+  User ||--o{ Lead : assignee
+  TransferOrder ||--o{ TransferOrderLine : lines
+
+  Contract ||--o{ RoyaltyTier : tiers
+  Contract ||--o{ RoyaltyStatement : statements
+  RoyaltyRun ||--o{ RoyaltyStatement : statements
+  User ||--o{ RoyaltyRun : "created/approved"
+  User ||--o| TelegramLink : "bot link"
+
+  Entity {
+    string code PK "TASNIM/TAHLIL/SOTUV_BOLIMI"
+    EntityType type
+  }
+  Partner {
+    string name
+    PartnerRoles roles "CLIENT/AGENT/PRINTER/EXT_PUBLISHER/SUPPLIER"
+    decimal creditLimit
+    Currency currency
+    boolean isBlocked
+  }
+  Title {
+    string workTitle
+    TitleStatus status
+    OwnerType ownerType "OWN/EXTERNAL"
+  }
+  Edition {
+    int editionNo
+    int plannedRun
+    EditionStatus status
+  }
+  Product {
+    ProductFormat format
+    string isbn13 UK
+    decimal listPrice
+  }
+  Warehouse {
+    string name
+    WarehouseType type "MAIN/SALES/AGENT"
+  }
+  CostEntry {
+    CostScope scope "TITLE/EDITION/FIXED"
+    CostCategory category
+    decimal amountUZS
+  }
+  SalesOrderLine {
+    int qty
+    decimal unitPrice
+    decimal discountRate "SEALED"
+    decimal cmUnit "SEALED"
+  }
+  TransferOrderLine {
+    decimal basePrice
+    decimal discountRate "SEALED"
+    decimal transferPrice
+  }
+  DiscountRule {
+    DiscountScope scope "PARTNER>VOLUME>TITLE>ENTITY>DEFAULT"
+    int minQty
+    decimal rate
+    int priority
+  }
+  Contract {
+    ContractType type "BUYOUT/ROYALTY"
+    decimal advanceAmount
+    boolean audioRights
+  }
+```
+
+> Standalone (FK-siz, `refId` polimorf): `DiscountRule`, `Notification`, `Setting`.
+
 ## Holat
 
-**0-bosqich (loyiha skeleti)** tayyor. Keyingi bosqich — maʼlumotlar bazasi
-sxemasi (v1 §3.2 yadro + v2 §4 delta) va seed. Qarang: [docs/spec.md](docs/spec.md).
+**1-bosqich (skelet)** va **2-bosqich (DB sxemasi + seed)** tayyor:
+40 model migratsiya qilingan, base seed (3 subʼyekt, AGENT omborlar, 9 rol,
+5 foydalanuvchi, 17 hamkor, 4 kanal, discount_rules) idempotent oʻtadi.
+Keyingi bosqich — Auth.js v5 + RBAC (v1 §3.3). Qarang: [docs/spec.md](docs/spec.md).

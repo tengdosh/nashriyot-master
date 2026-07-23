@@ -67,6 +67,19 @@ npm run dev | npm run test:unit | npm run e2e | npm run seed:demo
 npx prisma migrate dev | docker compose up -d
 Note: host port for postgres:16 is 5433 (local 5432 is occupied).
 
+## Pinned decisions
+Architectural deviations from the literal spec, locked in (rationale in git history):
+- **Prisma 6** (not 7) — classic `prisma-client-js`; import
+  `{ PrismaClient } from "@prisma/client"`. Prisma 7's new config/runtime model
+  was avoided to keep the spec-aligned workflow (`migrate dev`, `studio`, `db seed`).
+- **shadcn 4.x on Base UI** primitives (style `base-nova`, lucide icons) — not
+  Radix. Theme retuned to **slate neutrals + `--primary: #800E13`** (also
+  `--sidebar-primary`) in `app/globals.css`.
+- **No `@vitejs/plugin-react`** — it pulls Babel 8, conflicting with the `shadcn`
+  package's Babel 7. Vitest transforms TSX via its built-in **esbuild**.
+- **postgres:16 → host port 5433**, **redis:7 → host port 6380** (local 5432/6379
+  occupied). See `.env` / `docker-compose.yml`.
+
 ---
 
 ## Local dev notes (this environment)
