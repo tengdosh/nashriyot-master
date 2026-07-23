@@ -1,0 +1,58 @@
+# Nashriyot-Master — local development infrastructure.
+# Runs Postgres, Redis and the AI microservice. The Next.js app itself runs
+# on the host via `npm run dev`. Host ports avoid local conflicts:
+#   postgres:16 -> 5433 (local 5432 occupied)
+#   redis:7     -> 6380 (local 6379 occupied)
+#   ai-service  -> 8001
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: nashriyot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nashriyot
+      POSTGRES_PASSWORD: nashriyot
+      POSTGRES_DB: nashriyot
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nashriyot -d nashriyot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: nashriyot-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ai-service:
+    build: ./ai-service
+    container_name: nashriyot-ai
+    restart: unless-stopped
+    environment:
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-dev-ai-service-token}
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pgdata:
+  redisdata:

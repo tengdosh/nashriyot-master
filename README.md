@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nashriyot-Master
 
-## Getting Started
+Nashriyot uchun ERP tizimi (*publishing ERP*). Modulli monolit: **Next.js 15**
+(App Router, TypeScript strict) + **Prisma / PostgreSQL 16** + **Redis**, alohida
+**Python FastAPI** AI xizmati va **grammY** Telegram bot.
 
-First, run the development server:
+- Toʻliq spetsifikatsiya: [docs/spec.md](docs/spec.md) — V1 §3–§7, V2 §2–§9
+- Meʼmoriy qoidalar: [CLAUDE.md](CLAUDE.md)
+- Demo dunyo: [docs/demo-data.md](docs/demo-data.md) · Bot: [docs/playbook.md](docs/playbook.md)
+
+## Talablar
+
+- **Node.js 20+** (tavsiya: 22) va npm
+- **Docker** + Docker Compose
+
+## Ishga tushirish
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1) Muhit oʻzgaruvchilari
+cp .env.example .env          # kerak boʻlsa maxfiy qiymatlarni oʻzgartiring
+
+# 2) Infratuzilma: Postgres, Redis, AI xizmati
+docker compose up -d
+
+# 3) Bogʻliqliklar
+npm install
+
+# 4) Ilova
+npm run dev                   # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+AI xizmati sogʻligʻini tekshirish:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+curl http://localhost:8001/health     # {"status":"ok","service":"ai-service"}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Portlar
 
-## Learn More
+| Xizmat | Konteyner | Host port | Izoh |
+|---|---|---|---|
+| PostgreSQL 16 | 5432 | **5433** | lokal 5432 band |
+| Redis 7 | 6379 | **6380** | lokal 6379 band |
+| AI xizmati (FastAPI) | 8000 | **8001** | `/health` |
+| Next.js (dev) | — | **3000** | `npm run dev` |
 
-To learn more about Next.js, take a look at the following resources:
+`.env` dagi `DATABASE_URL` / `REDIS_URL` / `AI_SERVICE_URL` shu portlarga moslangan.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Buyruqlar
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Buyruq | Vazifa |
+|---|---|
+| `npm run dev` | Dev server (Turbopack) |
+| `npm run build` / `npm start` | Prod build / start |
+| `npm run test:unit` | Vitest birlik testlari |
+| `npm run test:coverage` | Qamrov hisoboti |
+| `npm run e2e` | Playwright E2E (avval `npx playwright install chromium`) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run db:migrate` | Prisma migratsiya (dev) |
+| `npm run db:studio` | Prisma Studio |
 
-## Deploy on Vercel
+## Loyiha tuzilishi
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```
+app/(app)/         # himoyalangan ilova modullari (keyingi bosqichlar)
+app/portal/        # muallif portali
+app/api/v1/        # REST endpointlar
+components/ui/      # shadcn/ui
+components/shared/  # umumiy komponentlar (DataTable, FormSheet, ...)
+lib/               # finance.ts, services/, validators/, rbac.ts, ...
+jobs/              # rejalashtirilgan ishlar (ROP, dead-stock, costing)
+ai-service/        # Python FastAPI AI mikroservisi
+bot/               # grammY Telegram bot
+prisma/            # schema.prisma, migratsiyalar
+tests/unit, tests/e2e/   # Vitest, Playwright
+docs/              # spec.md, demo-data.md, playbook.md
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Holat
+
+**0-bosqich (loyiha skeleti)** tayyor. Keyingi bosqich — maʼlumotlar bazasi
+sxemasi (v1 §3.2 yadro + v2 §4 delta) va seed. Qarang: [docs/spec.md](docs/spec.md).

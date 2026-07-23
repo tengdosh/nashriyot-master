@@ -1,0 +1,12 @@
+// Nashriyot-Master — Prisma schema.
+// The full data model (v1 §3.2 core + v2 §4 delta) is built in Task 2.
+// This Task 1 skeleton defines only the generator + PostgreSQL datasource.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
