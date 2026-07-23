@@ -1,0 +1,45 @@
+{
+  "app": {
+    "name": "Nashriyot-Master",
+    "tagline": "Nashriyot ERP tizimi"
+  },
+  "common": {
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "delete": "O'chirish",
+    "confirm": "Tasdiqlash",
+    "search": "Qidirish…",
+    "export": "CSV eksport",
+    "columns": "Ustunlar",
+    "loading": "Yuklanmoqda…",
+    "empty": "Ma'lumot yo'q",
+    "error": "Xatolik yuz berdi",
+    "retry": "Qayta urinish",
+    "actions": "Amallar",
+    "logout": "Chiqish",
+    "profile": "Profil",
+    "notifications": "Bildirishnomalar",
+    "prev": "Oldingi",
+    "next": "Keyingi",
+    "page": "Sahifa"
+  },
+  "nav": {
+    "dashboard": "Boshqaruv paneli",
+    "titles": "Sarlavhalar",
+    "acquisitions": "Akvizitsiya",
+    "production": "Ishlab chiqarish",
+    "inventory": "Ombor",
+    "sales": "Sotuv",
+    "transfers": "Transferlar",
+    "costing": "Tan narx",
+    "royalties": "Royalti",
+    "leads": "Lidlar",
+    "finance": "Moliya",
+    "analytics": "Analitika",
+    "ai": "AI Studio",
+    "admin": "Administratsiya"
+  },
+  "money": {
+    "suffix": "so'm"
+  }
+}

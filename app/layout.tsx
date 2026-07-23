@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 // Inter is the product typeface (docs/spec.md v1 §4.2). latin-ext covers
@@ -22,15 +26,19 @@ export const metadata: Metadata = {
   description: "Nashriyot ERP — nashriyot boshqaruv tizimi.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const messages = await getMessages();
   return (
     <html lang="uz" suppressHydrationWarning>
       <body className={`${inter.variable} ${geistMono.variable} antialiased`}>
-        {children}
+        <NextIntlClientProvider messages={messages}>
+          <TooltipProvider delay={200}>{children}</TooltipProvider>
+        </NextIntlClientProvider>
+        <Toaster />
       </body>
     </html>
   );
