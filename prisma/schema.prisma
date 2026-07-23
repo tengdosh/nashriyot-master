@@ -387,6 +387,7 @@ model Entity {
   payments        Payment[]
   transfersFrom   TransferOrder[] @relation("TransferFrom")
   transfersTo     TransferOrder[] @relation("TransferTo")
+  titles          Title[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -461,6 +462,7 @@ model Title {
   status         TitleStatus @default(DRAFT)
   ownerType      OwnerType   @default(OWN)
   ownerPartnerId String? // for EXTERNAL: owning external publisher
+  entityId       String? // producing subject (TASNIM/TAHLIL) — row-level scope
   language       String      @default("uz")
   seriesId       String?
   description    String?
@@ -468,7 +470,10 @@ model Title {
   themaCodes     String[]
   bisacCodes     String[]
 
+  searchVector Unsupported("tsvector")? // populated by DB trigger (⌘K search)
+
   ownerPartner    Partner?           @relation("TitleOwner", fields: [ownerPartnerId], references: [id])
+  entity          Entity?            @relation(fields: [entityId], references: [id])
   series          Series?            @relation(fields: [seriesId], references: [id])
   editions        Edition[]
   products        Product[]
@@ -486,6 +491,8 @@ model Title {
   @@index([status])
   @@index([seriesId])
   @@index([ownerType])
+  @@index([entityId])
+  @@index([searchVector], type: Gin)
 }
 
 model Edition {

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Bell, Check, ChevronDown, LogOut, Search } from "lucide-react";
+import { Bell, Check, ChevronDown, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { GlobalSearch } from "./global-search";
 import { cn } from "@/lib/utils";
 
 type EntityOpt = { id: string; code: string; name: string };
@@ -45,14 +46,7 @@ export function Topbar({
         )}
       </nav>
 
-      {/* ⌘K global search skeleton (wired in M2) */}
-      <button
-        type="button"
-        className="ml-4 hidden h-8 w-64 items-center gap-2 rounded-md border bg-muted/40 px-2.5 text-sm text-muted-foreground sm:flex"
-      >
-        <Search className="size-4" /> Qidirish…
-        <kbd className="ml-auto rounded bg-background px-1.5 py-0.5 text-xs">⌘K</kbd>
-      </button>
+      <GlobalSearch />
 
       <div className="ml-auto flex items-center gap-2">
         {entities.length > 1 && (
