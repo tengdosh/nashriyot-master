@@ -88,7 +88,7 @@ export async function receivePrintOrder(
       });
     });
 
-    await checkVariance(order.editionId, order.id, unitCostUZS.toNumber(), userId);
+    await checkVariance(order.editionId, order.id, unitCostUZS.toNumber());
     return { order: updated, unitCostUZS };
   });
 }
@@ -97,7 +97,6 @@ async function checkVariance(
   editionId: string | null,
   printOrderId: string,
   actualUnit: number,
-  userId: string,
 ): Promise<boolean> {
   if (!editionId) return false;
   const scenario = await prisma.plScenario.findFirst({

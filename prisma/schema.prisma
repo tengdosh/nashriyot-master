@@ -155,6 +155,44 @@ enum ReturnCondition {
   DAMAGED
 }
 
+/**
+ * ABC class from cumulative annual revenue: A 0–80%, B 80–95%, C 95–100%.
+ */
+enum AbcClass {
+  A
+  B
+  C
+}
+
+/**
+ * Disposal ladder for a dead-stock flag (spec v1 §5.4, six steps in order).
+ */
+enum DisposalAction {
+  PRICE_CUT // narx pasaytirish
+  BUNDLE // to'plam
+  RETURN_TO_SUPPLIER // qaytarish
+  WHOLESALE // ulgurji
+  DONATION // xayriya
+  WRITE_OFF // hisobdan chiqarish
+}
+
+enum DeadStockStatus {
+  OPEN // yangi aniqlangan
+  IN_PROGRESS // tasarruf ustasi boshlangan
+  RESOLVED // sotildi/qaytardi — endi o'lik emas
+  WRITTEN_OFF // hisobdan chiqarildi
+}
+
+/**
+ * Write-downs are maker-checker: createdBy != approvedBy (spec §3.3).
+ */
+enum WriteDownStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
 enum TransferOrderStatus {
   DRAFT // QORALAMA
   SHIPPED // JO'NATILDI
@@ -297,6 +335,8 @@ model User {
   assignedTasks       ProductionTask[] @relation("TaskAssignee")
   leads               Lead[]           @relation("LeadAssignee")
   telegramLink        TelegramLink?
+  writeDownsCreated   WriteDown[]      @relation("WriteDownMaker")
+  writeDownsApproved  WriteDown[]      @relation("WriteDownChecker")
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -528,6 +568,7 @@ model Product {
   pages     Int?
   listPrice Decimal       @db.Decimal(18, 2)
   vatRate   Decimal       @default(0) @db.Decimal(6, 4)
+  abcClass  AbcClass? // recomputed nightly by the ABC job (M5)
 
   title                Title                 @relation(fields: [titleId], references: [id])
   edition              Edition?              @relation(fields: [editionId], references: [id])
@@ -541,6 +582,8 @@ model Product {
   priceRecommendations PriceRecommendation[]
   reorderRule          ReorderRule?
   dailyUnitCosts       DailyUnitCost[]
+  deadStockFlags       DeadStockFlag[]
+  writeDowns           WriteDown[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -779,6 +822,71 @@ model ReorderRule {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/**
+ * One row per SKU flagged by the nightly dead-stock scanner (spec v1 §6.2).
+ * The three loss components are stored separately so the UI can show the
+ * breakdown, and `totalLoss` is their sum — sealed at scan time. `unitCost` is
+ * the FIFO weighted average today (v2: it becomes reportCost after M12).
+ */
+model DeadStockFlag {
+  id        String @id @default(cuid())
+  productId String @unique // one live flag per SKU; the scanner upserts it
+
+  ageDays           Int
+  qtyOnHand         Int
+  unitCost          Decimal         @db.Decimal(18, 2)
+  deadCost          Decimal         @db.Decimal(18, 2) // qty × unitCost
+  carryingCost      Decimal         @db.Decimal(18, 2) // deadCost × carryingRate
+  opportunityCost   Decimal         @db.Decimal(18, 2) // deadCost × expectedROI
+  totalLoss         Decimal         @db.Decimal(18, 2) // sum of the three
+  carryingRate      Decimal         @db.Decimal(6, 4) // SEALED settings at scan time
+  expectedROI       Decimal         @db.Decimal(6, 4)
+  thresholdDays     Int
+  status            DeadStockStatus @default(OPEN)
+  suggestedAction   DisposalAction?
+  suggestedDiscount Decimal?        @db.Decimal(6, 4) // from ageDiscountTiers
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  scannedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([scannedAt])
+}
+
+/**
+ * Inventory write-off / write-down. Maker-checker enforced in the service:
+ * createdById may never equal approvedById (lib/maker-checker.ts).
+ */
+model WriteDown {
+  id        String @id @default(cuid())
+  productId String
+
+  warehouseId String
+  qty         Int
+  unitCost    Decimal         @db.Decimal(18, 2) // FIFO cost consumed
+  amountUZS   Decimal         @db.Decimal(18, 2) // qty × unitCost
+  action      DisposalAction  @default(WRITE_OFF)
+  reason      String
+  status      WriteDownStatus @default(PENDING_APPROVAL)
+
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+
+  product    Product @relation(fields: [productId], references: [id])
+  createdBy  User    @relation("WriteDownMaker", fields: [createdById], references: [id])
+  approvedBy User?   @relation("WriteDownChecker", fields: [approvedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([status])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

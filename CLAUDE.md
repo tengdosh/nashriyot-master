@@ -79,6 +79,16 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   package's Babel 7. Vitest transforms TSX via its built-in **esbuild**.
 - **postgres:16 → host port 5433**, **redis:7 → host port 6380** (local 5432/6379
   occupied). See `.env` / `docker-compose.yml`.
+- **M5 revenue/CM are measured from stock movements until M6 ships.** ABC annual
+  revenue = OUT qty × listPrice; the valuable-backlist CM12 = (listPrice −
+  FIFO cost) × OUT qty. Both switch to the SEALED per-line net revenue and
+  `cmUnit` on sales-order lines once M6 exists. Marked in
+  `reorder-service.annualRevenue` and `dead-stock-service.backlistSignals`.
+- **A sellable RETURN is its own FIFO layer**, not a second IN row
+  (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
+  four-state view and consumable by `fifoIssue` without double-counting.
+- **Write-offs and stock corrections are typed ADJUST, never OUT**, so nothing
+  but a real sale can ever land in the "Sotilgan" figure.
 
 ---
 

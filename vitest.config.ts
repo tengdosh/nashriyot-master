@@ -21,6 +21,7 @@ export default defineConfig({
       // suite fails if finance.ts (and later costing/royalty) regress.
       thresholds: {
         "lib/finance.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/inventory-analytics.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },
