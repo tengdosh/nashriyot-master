@@ -22,6 +22,7 @@ export default defineConfig({
       thresholds: {
         "lib/finance.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/inventory-analytics.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/sales.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },

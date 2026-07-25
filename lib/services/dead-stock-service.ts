@@ -21,28 +21,48 @@ export class WriteDownError extends Error {
 /**
  * 12-month contribution margin and turnover for the valuable-backlist guard.
  *
- * Until M6 seals cogsUnit/cmUnit onto sales lines, CM is measured at LIST price
- * against the FIFO cost of the copies that actually left the warehouse — a real,
- * conservative margin. M6 replaces this with the sealed per-line CM.
+ * CM12 comes from the SEALED `cmUnit` on shipped sales-order lines (M6), net of
+ * returns — the same number the sales module reports, never a recomputation.
+ *
+ * Copies issued WITHOUT a sales order (opening balances, migrated history) have
+ * no sealed CM, so they are valued at list price minus their FIFO cost. That
+ * keeps a legacy SKU from looking margin-less and being wrongly disposed of.
  */
 async function backlistSignals(productId: string, now: Date) {
   const from = new Date(now.getTime() - 365 * 86_400_000);
-  const [product, outs, avgQoh] = await Promise.all([
+  const [product, outs, avgQoh, soldLines] = await Promise.all([
     prisma.product.findUniqueOrThrow({ where: { id: productId }, select: { listPrice: true } }),
     prisma.stockMovement.findMany({
       where: { productId, type: "OUT", date: { gte: from } },
-      select: { qty: true, unitCost: true, date: true },
+      select: { qty: true, unitCost: true, date: true, refType: true },
     }),
     quantityOnHand(productId),
+    prisma.salesOrderLine.findMany({
+      where: {
+        productId,
+        cmUnit: { not: null },
+        order: { status: { in: ["SHIPPED", "INVOICED", "PAID"] }, shippedDate: { gte: from } },
+      },
+      select: { qty: true, cmUnit: true, returns: { select: { qty: true } } },
+    }),
   ]);
 
   let cm12 = new Prisma.Decimal(0);
+  // Sealed CM on the copies the customer kept.
+  for (const l of soldLines) {
+    const returned = l.returns.reduce((a, r) => a + r.qty, 0);
+    cm12 = cm12.plus(new Prisma.Decimal(l.cmUnit!).times(l.qty - returned));
+  }
+
   let unitsSold = 0;
   const monthly = new Array<number>(12).fill(0);
   for (const o of outs) {
     unitsSold += o.qty;
-    const cogsUnit = new Prisma.Decimal(o.unitCost ?? 0);
-    cm12 = cm12.plus(new Prisma.Decimal(product.listPrice).minus(cogsUnit).times(o.qty));
+    if (o.refType !== "SalesOrder") {
+      // No sealed CM for this movement — value it at list minus FIFO cost.
+      const cogsUnit = new Prisma.Decimal(o.unitCost ?? 0);
+      cm12 = cm12.plus(new Prisma.Decimal(product.listPrice).minus(cogsUnit).times(o.qty));
+    }
     const monthsAgo = Math.floor((now.getTime() - o.date.getTime()) / (30 * 86_400_000));
     if (monthsAgo >= 0 && monthsAgo < 12) monthly[11 - monthsAgo] += o.qty;
   }

@@ -79,11 +79,26 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   package's Babel 7. Vitest transforms TSX via its built-in **esbuild**.
 - **postgres:16 → host port 5433**, **redis:7 → host port 6380** (local 5432/6379
   occupied). See `.env` / `docker-compose.yml`.
-- **M5 revenue/CM are measured from stock movements until M6 ships.** ABC annual
-  revenue = OUT qty × listPrice; the valuable-backlist CM12 = (listPrice −
-  FIFO cost) × OUT qty. Both switch to the SEALED per-line net revenue and
-  `cmUnit` on sales-order lines once M6 exists. Marked in
-  `reorder-service.annualRevenue` and `dead-stock-service.backlistSignals`.
+- **M5 revenue/CM read SEALED sales lines (done in M6).** ABC annual revenue =
+  sealed net revenue from shipped orders net of returns; the valuable-backlist
+  CM12 = sealed `cmUnit` × kept copies. Stock issued WITHOUT a sales order
+  (opening balances, migrated history) still falls back to listPrice/FIFO so a
+  legacy SKU is not ranked at zero. See `reorder-service.annualRevenue` and
+  `dead-stock-service.backlistSignals`.
+- **Prisma `not:` skips NULL rows.** `refType: { not: "SalesOrder" }` drops every
+  row where refType IS NULL (SQL three-valued logic). Always pair it with an
+  explicit `OR: [{ field: null }, …]` — this silently zeroed the whole ABC curve
+  once.
+- **CM is written exactly once, in `shipSalesOrder`.** Everything downstream
+  reads the sealed `cogsUnit`/`cmUnit`; no screen or report recomputes a shipped
+  margin, so a later price, channel-fee or discount-rule change cannot move it.
+- **P_min = uc / (1 − discount − royalty)** is checked against the LIST price at
+  order-save time. A breach is a hard block; `overridePMin` needs
+  `admin.settings` and raises a notification. `discount + royalty >= 1` reports
+  an infinite floor instead of throwing.
+- **A royalty estimate per copy exists only for a ROYALTY contract.** BUYOUT
+  author money is already a title-unique cost (M3), so charging it per copy in CM
+  would double-count it.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.

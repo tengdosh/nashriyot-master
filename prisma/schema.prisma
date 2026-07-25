@@ -266,6 +266,15 @@ enum PayableStatus {
   PAID
 }
 
+/**
+ * AR mirrors AP: opened at INVOICED, closed by payments (spec v1 §5.5).
+ */
+enum ReceivableStatus {
+  OPEN
+  PARTIAL
+  PAID
+}
+
 enum PaymentDirection {
   IN
   OUT
@@ -424,6 +433,7 @@ model Entity {
   warehouses      Warehouse[]
   costEntries     CostEntry[]
   salesOrders     SalesOrder[]
+  receivables     Receivable[]
   payments        Payment[]
   transfersFrom   TransferOrder[] @relation("TransferFrom")
   transfersTo     TransferOrder[] @relation("TransferTo")
@@ -449,6 +459,7 @@ model Partner {
   ownedTitles     Title[]      @relation("TitleOwner")
   printOrders     PrintOrder[]
   salesOrders     SalesOrder[]
+  receivables     Receivable[]
   payables        Payable[]
   payments        Payment[]
 
@@ -930,6 +941,7 @@ model SalesOrder {
   warehouse         Warehouse        @relation(fields: [warehouseId], references: [id])
   partner           Partner?         @relation(fields: [partnerId], references: [id])
   lines             SalesOrderLine[]
+  receivable        Receivable?
   convertedFromLead Lead?            @relation("LeadConverted")
 
   createdAt DateTime @default(now())
@@ -1152,6 +1164,35 @@ model RoyaltyStatement {
 // ─────────────────────────────────────────────────────────────────────────────
 // Finance (M15)
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Accounts receivable. Opened when an order reaches INVOICED and closed by
+ * payments. `amountUZS` is SEALED from the invoiced order total, so later edits
+ * to channel or discount rules never move an existing debt.
+ */
+model Receivable {
+  id        String  @id @default(cuid())
+  orderId   String  @unique // one AR row per sales order
+  partnerId String?
+  entityId  String
+
+  amountUZS Decimal          @db.Decimal(18, 2)
+  paidUZS   Decimal          @default(0) @db.Decimal(18, 2)
+  dueDate   DateTime?
+  status    ReceivableStatus @default(OPEN)
+
+  order   SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  partner Partner?   @relation(fields: [partnerId], references: [id])
+  entity  Entity     @relation(fields: [entityId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partnerId])
+  @@index([entityId])
+  @@index([status])
+  @@index([dueDate])
+}
+
 model Payable {
   id        String        @id @default(cuid())
   partnerId String

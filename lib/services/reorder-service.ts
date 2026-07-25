@@ -14,6 +14,7 @@ import {
 } from "@/lib/inventory-analytics";
 import { getInventorySettings, type InventorySettings } from "./inventory-settings";
 import { fifoAvgUnitCost, onOrderQty, salesSeries } from "./inventory-service";
+import { netSalesByProduct } from "./returns-service";
 
 /**
  * ROP monitor and ABC classifier (spec v1 §6.3, nightly 03:00).
@@ -137,32 +138,46 @@ export type AbcRowView = {
 };
 
 /**
- * Annual revenue per SKU for the ABC curve.
+ * Annual revenue per SKU for the ABC curve — SEALED net revenue from shipped
+ * sales-order lines (M6), net of returns.
  *
- * Interim measure until M6: units that left the warehouse (OUT) valued at list
- * price. M6 replaces this with the sealed net revenue on sales-order lines.
+ * A SKU with no sales lines in the window falls back to OUT movements × list
+ * price. That covers stock issued outside the sales module (opening balances,
+ * migrated history) instead of ranking those SKUs at zero.
  */
-async function annualRevenue(now: Date) {
+export async function annualRevenue(now: Date) {
   const from = new Date(now.getTime() - 365 * 86_400_000);
   const products = await prisma.product.findMany({
     where: { archivedAt: null },
     select: { id: true, sku: true, listPrice: true, title: { select: { workTitle: true } } },
   });
-  const sold = await prisma.stockMovement.groupBy({
+
+  const sealed = await netSalesByProduct(from, now);
+  const sealedById = new Map(sealed.map((s) => [s.product.id, s]));
+
+  // Units that left the warehouse WITHOUT a sales order behind them. The
+  // explicit null branch matters: in SQL `refType != 'SalesOrder'` is NULL for
+  // NULL rows, which would silently drop every un-referenced movement.
+  const movementOnly = await prisma.stockMovement.groupBy({
     by: ["productId"],
-    where: { type: "OUT", date: { gte: from } },
+    where: {
+      type: "OUT",
+      date: { gte: from },
+      OR: [{ refType: null }, { refType: { not: "SalesOrder" } }],
+    },
     _sum: { qty: true },
   });
-  const qtyById = new Map(sold.map((s) => [s.productId, s._sum.qty ?? 0]));
+  const looseQtyById = new Map(movementOnly.map((s) => [s.productId, s._sum.qty ?? 0]));
 
-  return products.map((p) => ({
-    item: {
-      productId: p.id,
-      sku: p.sku,
-      workTitle: p.title.workTitle,
-    },
-    revenue: new Prisma.Decimal(p.listPrice).times(qtyById.get(p.id) ?? 0),
-  }));
+  return products.map((p) => {
+    const s = sealedById.get(p.id);
+    const looseQty = looseQtyById.get(p.id) ?? 0;
+    const looseRevenue = new Prisma.Decimal(p.listPrice).times(looseQty);
+    return {
+      item: { productId: p.id, sku: p.sku, workTitle: p.title.workTitle },
+      revenue: (s?.revenue ?? new Prisma.Decimal(0)).plus(looseRevenue),
+    };
+  });
 }
 
 /** Recompute and persist Product.abcClass from the cumulative 80/15/5 curve. */
