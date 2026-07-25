@@ -99,6 +99,21 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
 - **A royalty estimate per copy exists only for a ROYALTY contract.** BUYOUT
   author money is already a title-unique cost (M3), so charging it per copy in CM
   would double-count it.
+- **Royalty tiers are CUMULATIVE over the contract's life, per format.** A
+  period's units are placed at `cumulativeBefore` on the lifetime axis and may
+  span several tiers. `cumulativeBefore` is derived from sealed sales BEFORE the
+  period — NOT from prior statements — so a period that was never run still
+  advances the ladder and a re-run is byte-identical.
+- **A sealed royalty period owns its date window.** Checking only the period
+  LABEL is not enough: "2026-H1" and "2026-M03" would each pay the author for the
+  same March sales. `runRoyalty` refuses any window overlapping a sealed run, and
+  `assertDateNotSealed` guards late edits.
+- **Reserve release and payable are floored at zero.** If last period's returns
+  cost more than was held back, the publisher absorbs it; a period never bills an
+  author. Clawing back would make a statement the author already received
+  retroactively wrong — which is the exact thing the reserve exists to prevent.
+- **An ACTIVE contract's tier table is frozen** (and its advance too, once a
+  statement exists). Re-rating history would break the §6.5 determinism promise.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
