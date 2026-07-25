@@ -15,6 +15,7 @@ import {
   SalesChannelType,
   DiscountScope,
   Currency,
+  ContributorRole,
 } from "@prisma/client";
 import { hash } from "@node-rs/argon2";
 
@@ -308,6 +309,38 @@ async function main() {
     });
     await prisma.userRole.upsert({ where: { userId_roleId: { userId: u.id, roleId } }, update: {}, create: { userId: u.id, roleId } });
   }
+
+  // Author portal subject: a contributor + a user linked by contributorId, so
+  // the row-level portal (M8) has a real author to scope to. The AUTHOR role
+  // carries only portal.read — an author sees nothing of the admin app.
+  await prisma.contributor.upsert({
+    where: { id: "contrib-author-demo" },
+    update: { fullName: "Oybek Nazarov", role: ContributorRole.AUTHOR },
+    create: { id: "contrib-author-demo", fullName: "Oybek Nazarov", role: ContributorRole.AUTHOR },
+  });
+  await prisma.user.upsert({
+    where: { id: "user-author" },
+    update: {
+      email: "author@nashriyot.uz",
+      fullName: "Oybek Nazarov",
+      passwordHash,
+      isActive: true,
+      contributorId: "contrib-author-demo",
+    },
+    create: {
+      id: "user-author",
+      email: "author@nashriyot.uz",
+      fullName: "Oybek Nazarov",
+      passwordHash,
+      isActive: true,
+      contributorId: "contrib-author-demo",
+    },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: "user-author", roleId: "role-AUTHOR" } },
+    update: {},
+    create: { userId: "user-author", roleId: "role-AUTHOR" },
+  });
 
   // Channels
   for (const c of CHANNELS) {

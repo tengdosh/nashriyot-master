@@ -114,6 +114,20 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   retroactively wrong — which is the exact thing the reserve exists to prevent.
 - **An ACTIVE contract's tier table is frozen** (and its advance too, once a
   statement exists). Re-rating history would break the §6.5 determinism promise.
+- **The author portal is row-scoped by `contributorId` in the query, never the
+  UI.** Every `portal-service` function takes a contributorId and filters to it;
+  `portalStatementForContributor` is the authoritative access check and throws
+  the SAME generic error for another author's / unsent / missing statement (no
+  info leak). The portal shows ONLY `status: SENT` runs.
+- **Report downloads are gated twice:** an HMAC-signed, 15-min token
+  (`signReportToken`/`verifyReportToken`) AND a fresh DB ownership + SENT
+  re-check in the route. A leaked or forged link cannot cross authors or outlive
+  its window. Signing key = `AUTH_SECRET`.
+- **The `/portal` prefix is AUTHOR-only in middleware; `/api/portal/*` is NOT**
+  (the matcher excludes `/api`) — the download route defends itself with the
+  token, so never assume middleware ran for it.
+- **Seeded author login:** `author@nashriyot.uz` (role AUTHOR, linked to
+  `contrib-author-demo`). It has `portal.read` only — no admin app access.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
