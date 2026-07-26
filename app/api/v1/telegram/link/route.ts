@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { hasValidServiceToken } from "@/lib/reports-auth";
-import { linkChat, unlinkChat, chatIdentity, setSubscriptions, TelegramError } from "@/lib/services/telegram-service";
+import { linkChat, unlinkChat, setSubscriptions, TelegramError } from "@/lib/services/telegram-service";
 
 const linkSchema = z.object({ chatId: z.string().min(1), code: z.string().regex(/^\d{6}$/, "6 xonali kod") });
 const unlinkSchema = z.object({ chatId: z.string().min(1), action: z.literal("unlink") });
@@ -36,15 +36,4 @@ export async function POST(req: NextRequest) {
     const message = e instanceof Error ? e.message : "Server xatosi";
     return NextResponse.json({ data: null, error: message }, { status: 400 });
   }
-}
-
-/** GET ?chatId= — resolve who a chat is + their permitted menu. */
-export async function GET(req: NextRequest) {
-  if (!hasValidServiceToken(req)) {
-    return NextResponse.json({ data: null, error: "Token yaroqsiz" }, { status: 401 });
-  }
-  const chatId = req.nextUrl.searchParams.get("chatId");
-  if (!chatId) return NextResponse.json({ data: null, error: "chatId majburiy" }, { status: 400 });
-  const identity = await chatIdentity(chatId);
-  return NextResponse.json({ data: identity });
 }
