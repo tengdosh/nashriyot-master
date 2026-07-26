@@ -1,0 +1,10 @@
+{
+  "name": "nashriyot-bot",
+  "private": true,
+  "description": "Read-only Telegram report assistant (grammY). Part of the nashriyot-master monorepo; shares the root dependency tree.",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "//": "Runtime deps (grammy, @anthropic-ai/sdk, zod, tsx) live in the root package.json — the bot imports pure logic from ../lib via the @/ path alias."
+}

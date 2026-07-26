@@ -3,7 +3,8 @@
 import * as React from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { Bell, Check, ChevronDown, LogOut } from "lucide-react";
+import Link from "next/link";
+import { Bell, Check, ChevronDown, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -92,6 +93,9 @@ export function Topbar({
               <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem render={<Link href="/profile" />}>
+              <User className="size-4" /> Profil va Telegram
+            </DropdownMenuItem>
             <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
               <LogOut className="size-4" /> Chiqish
             </DropdownMenuItem>

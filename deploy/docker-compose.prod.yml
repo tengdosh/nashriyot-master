@@ -40,5 +40,23 @@ services:
       retries: 5
       start_period: 10s
 
+  # Read-only Telegram report bot. Isolated service; exits cleanly if no token
+  # is configured, so it is safe to declare before a BotFather token exists.
+  # host.docker.internal lets the container reach the host-run Next app (:3100).
+  bot:
+    build:
+      context: ..
+      dockerfile: bot/Dockerfile
+    container_name: nashriyot-prod-bot
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      REPORTS_API_TOKEN: ${REPORTS_API_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      BOT_AI_MODEL: ${BOT_AI_MODEL:-claude-sonnet-5}
+      PLATFORM_API_URL: ${PLATFORM_API_URL:-http://host.docker.internal:3100}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   nashriyot_prod_pg:

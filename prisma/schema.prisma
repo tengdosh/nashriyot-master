@@ -335,17 +335,18 @@ model User {
   isActive      Boolean @default(true)
   contributorId String? @unique
 
-  contributor         Contributor?     @relation(fields: [contributorId], references: [id])
+  contributor         Contributor?       @relation(fields: [contributorId], references: [id])
   roles               UserRole[]
-  entityAccess        Entity[]         @relation("UserEntityAccess")
+  entityAccess        Entity[]           @relation("UserEntityAccess")
   auditLogs           AuditLog[]
-  royaltyRunsCreated  RoyaltyRun[]     @relation("RoyaltyRunCreatedBy")
-  royaltyRunsApproved RoyaltyRun[]     @relation("RoyaltyRunApprovedBy")
-  assignedTasks       ProductionTask[] @relation("TaskAssignee")
-  leads               Lead[]           @relation("LeadAssignee")
+  royaltyRunsCreated  RoyaltyRun[]       @relation("RoyaltyRunCreatedBy")
+  royaltyRunsApproved RoyaltyRun[]       @relation("RoyaltyRunApprovedBy")
+  assignedTasks       ProductionTask[]   @relation("TaskAssignee")
+  leads               Lead[]             @relation("LeadAssignee")
   telegramLink        TelegramLink?
-  writeDownsCreated   WriteDown[]      @relation("WriteDownMaker")
-  writeDownsApproved  WriteDown[]      @relation("WriteDownChecker")
+  telegramLinkCodes   TelegramLinkCode[]
+  writeDownsCreated   WriteDown[]        @relation("WriteDownMaker")
+  writeDownsApproved  WriteDown[]        @relation("WriteDownChecker")
   savedReports        SavedReport[]
   dashboardLayout     DashboardLayout?
 
@@ -1419,4 +1420,24 @@ model TelegramLink {
   linkedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/**
+ * One-time 6-digit code that binds a Telegram chat to a platform user.
+ * The plaintext is shown once in the profile page; only the hash is stored,
+ * and it expires after 10 minutes (spec §5 "Hisob ulash oqimi").
+ */
+model TelegramLinkCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

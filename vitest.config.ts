@@ -32,6 +32,8 @@ export default defineConfig({
         "lib/transfer.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/leads.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/finance-center.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/reports-catalog.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/bot-format.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },
