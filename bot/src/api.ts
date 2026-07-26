@@ -60,6 +60,18 @@ export async function subscribe(chatId: string, subscriptions: unknown): Promise
   return res.ok;
 }
 
+export type ChatPush = { chatId: string; notifications: { id: string; text: string }[] };
+
+/** Poll per-chat pending push notifications since `sinceIso` (playbook §5.2). */
+export async function getPushes(sinceIso: string): Promise<ChatPush[]> {
+  const res = await fetch(`${BASE}/api/v1/telegram/pushes?since=${encodeURIComponent(sinceIso)}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) return [];
+  const body = (await res.json()) as { data: ChatPush[] | null };
+  return body.data ?? [];
+}
+
 export type ReportResponse = { data: unknown; generatedAt: string; params: unknown; error?: string };
 
 /** Run a whitelisted report as the given user. */

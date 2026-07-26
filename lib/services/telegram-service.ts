@@ -2,6 +2,7 @@ import { createHmac, randomInt } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { menuForPermissions } from "@/lib/reports-catalog";
 import { callerFromUserId } from "@/lib/reports-auth";
+import { matchesSubscription, renderNotification } from "@/lib/notify";
 
 export class TelegramError extends Error {
   constructor(message: string) {
@@ -89,4 +90,61 @@ export async function setSubscriptions(chatId: string, subscriptions: unknown): 
   const link = await prisma.telegramLink.findUnique({ where: { chatId } });
   if (!link) throw new TelegramError("Chat ulanmagan");
   await prisma.telegramLink.update({ where: { chatId }, data: { subscriptions: subscriptions as object } });
+}
+
+export type ChatPush = { chatId: string; notifications: { id: string; text: string }[] };
+
+/**
+ * Pending push notifications per subscribed chat (playbook §5.2). Returns unread
+ * notifications created since `since` that each chat opted into AND its linked
+ * user is permitted to see (entity-scoped). The bot dedupes by notification id.
+ */
+export async function pendingPushes(sinceIso?: string): Promise<ChatPush[]> {
+  const since = sinceIso ? new Date(sinceIso) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const [notifications, links] = await Promise.all([
+    prisma.notification.findMany({
+      where: { isRead: false, createdAt: { gte: since } },
+      orderBy: { createdAt: "asc" },
+      take: 200,
+    }),
+    prisma.telegramLink.findMany({
+      include: {
+        user: {
+          include: {
+            entityAccess: { select: { id: true } },
+            roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+          },
+        },
+      },
+    }),
+  ]);
+  if (notifications.length === 0 || links.length === 0) return [];
+
+  const out: ChatPush[] = [];
+  for (const link of links) {
+    if (!link.user || !link.user.isActive) continue;
+    const permissions = Array.from(
+      new Set(link.user.roles.flatMap((r) => r.role.permissions.map((p) => p.permission.code))),
+    );
+    const entityAccess = new Set(link.user.entityAccess.map((e) => e.id));
+    const subscription = link.subscriptions as { daily?: boolean; events?: string[] } | null;
+
+    const matched = notifications.filter((n) => {
+      if (!matchesSubscription(n.type, subscription, permissions)) return false;
+      // Entity-scoped notifications only reach users with that entity in access.
+      if (n.entityId && !entityAccess.has(n.entityId)) return false;
+      return true;
+    });
+    if (matched.length === 0) continue;
+
+    out.push({
+      chatId: link.chatId,
+      notifications: matched.map((n) => ({
+        id: n.id,
+        text: renderNotification({ type: n.type, severity: n.severity, title: n.title, body: n.body, linkUrl: n.linkUrl }),
+      })),
+    });
+  }
+  return out;
 }

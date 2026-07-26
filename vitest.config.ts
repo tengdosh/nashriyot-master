@@ -37,6 +37,7 @@ export default defineConfig({
         "lib/import-map.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/prompts/geo.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/audio.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/notify.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },

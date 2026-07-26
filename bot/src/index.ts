@@ -125,6 +125,28 @@ function startBot(token: string) {
     await reply(chatId, answer);
   });
 
+  // Push poller (playbook §5.2): fetch pending notifications per chat, send once.
+  const PUSH_INTERVAL_MS = Number(process.env.BOT_PUSH_INTERVAL_MS ?? 120_000);
+  const pushedIds = new Set<string>();
+  let pushSince = new Date().toISOString();
+  async function pollPushes() {
+    try {
+      const chats = await api.getPushes(pushSince);
+      pushSince = new Date().toISOString();
+      for (const c of chats) {
+        for (const n of c.notifications) {
+          if (pushedIds.has(n.id)) continue;
+          pushedIds.add(n.id);
+          await reply(Number(c.chatId), n.text, { parse_mode: "Markdown" });
+        }
+      }
+      if (pushedIds.size > 5000) pushedIds.clear(); // bound memory
+    } catch (err) {
+      console.error("[bot] push xato:", err);
+    }
+  }
+  if (PUSH_INTERVAL_MS > 0) setInterval(pollPushes, PUSH_INTERVAL_MS);
+
   bot.catch((err) => console.error("[bot] xato:", err));
   bot.start({ onStart: (me) => console.log(`[bot] @${me.username} ishga tushdi (long polling).`) });
 }
