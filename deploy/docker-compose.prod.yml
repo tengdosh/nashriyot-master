@@ -1,0 +1,44 @@
+# Nashriyot-Master — isolated production stack for 172.30.0.36.
+# Deliberately separate container names, volume and host ports so it never
+# collides with the existing dev infra (nashriyot-postgres/ai on 5433/8001) or
+# the Tengdosh platform on this host.
+#   postgres -> host 5533   ai-service -> host 8010   app -> host 3100
+# The Next app runs on the HOST (node .next/standalone) per the project's
+# "infra in Docker, app on host" convention; this file provides infra only.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: nashriyot-prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nashriyot
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nashriyot}
+      POSTGRES_DB: nashriyot
+    ports:
+      - "127.0.0.1:5533:5432"
+    volumes:
+      - nashriyot_prod_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nashriyot -d nashriyot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ai-service:
+    build: ../ai-service
+    container_name: nashriyot-prod-ai
+    restart: unless-stopped
+    environment:
+      AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:-prod-ai-token}
+    ports:
+      - "127.0.0.1:8010:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  nashriyot_prod_pg:
