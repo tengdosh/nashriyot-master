@@ -34,6 +34,7 @@ export default defineConfig({
         "lib/finance-center.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/reports-catalog.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/bot-format.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/import-map.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },
