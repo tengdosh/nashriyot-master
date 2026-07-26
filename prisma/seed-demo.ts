@@ -113,28 +113,27 @@ type Book = {
 };
 
 const BOOKS: Book[] = [
-  { key: "T1", entity: "ent-tasnim", title: "Sabr sharbati", keywords: ["sabr", "ma'naviyat"], listPrice: 62_000, printUnit: 24_000, status: "ACTIVE", monthlyQty: 320, activeFrom: "2025-05-01", editions: [{ no: 1, run: 5000 }, { no: 2, run: 7000 }] },
-  { key: "T2", entity: "ent-tasnim", title: "Tafakkur bog'i", keywords: ["tafakkur"], listPrice: 48_000, printUnit: 26_000, status: "ACTIVE", monthlyQty: 40, activeFrom: "2025-01-01", deadStock: true },
-  { key: "T3", entity: "ent-tasnim", title: "Oila qal'asi", keywords: ["oila"], listPrice: 55_000, printUnit: 27_000, status: "ACTIVE", monthlyQty: 120, activeFrom: "2025-03-01" },
-  { key: "T5", entity: "ent-tasnim", title: "Qalb tozaligi", keywords: ["qalb"], listPrice: 51_000, printUnit: 22_000, status: "ACTIVE", monthlyQty: 150, activeFrom: "2025-02-01" },
-  { key: "T6", entity: "ent-tasnim", title: "Hidoyat yo'li", keywords: ["hidoyat"], listPrice: 58_000, printUnit: 23_500, status: "ACTIVE", monthlyQty: 210, activeFrom: "2025-01-01" },
-  { key: "T7", entity: "ent-tasnim", title: "Duolar xazinasi", keywords: ["duo"], listPrice: 45_000, printUnit: 19_000, status: "ACTIVE", monthlyQty: 260, activeFrom: "2025-01-01" },
-  { key: "T9", entity: "ent-tasnim", title: "Ziyo qissasi (lotin)", keywords: ["ziyo"], listPrice: 40_000, printUnit: 18_000, status: "ACTIVE", monthlyQty: 90, activeFrom: "2025-04-01" },
-  { key: "T11", entity: "ent-tasnim", title: "Zafar tongi", keywords: ["zafar"], listPrice: 75_000, printUnit: 31_000, status: "ACTIVE", monthlyQty: 170, activeFrom: "2025-05-01" },
-  { key: "T12", entity: "ent-tasnim", title: "Aqida darsligi", keywords: ["darslik", "aqida"], listPrice: 68_000, printUnit: 28_000, status: "ACTIVE", monthlyQty: 130, activeFrom: "2025-01-01", textbook: true },
-  { key: "T13", entity: "ent-tasnim", title: "Nur qissasi", keywords: ["nur"], listPrice: 52_000, printUnit: 21_000, status: "ACTIVE", monthlyQty: 110, activeFrom: "2026-05-01" },
-  { key: "T14", entity: "ent-tasnim", title: "Hikmat javohiri", keywords: ["hikmat"], listPrice: 60_000, printUnit: 24_000, status: "ACTIVE", format: "AUDIO", monthlyQty: 140, activeFrom: "2025-06-01", audioRights: true },
-  { key: "T15", entity: "ent-tasnim", title: "Sukunat kuchi", keywords: ["sukunat"], listPrice: 50_000, printUnit: 22_000, status: "ACTIVE", monthlyQty: 100, activeFrom: "2025-06-01" },
-  { key: "T17", entity: "ent-tasnim", title: "Yoshlik daftari", keywords: ["yoshlik"], listPrice: 47_000, printUnit: 20_000, status: "REVIEW", monthlyQty: 0, activeFrom: "2026-06-01", noSales: true },
-  { key: "T18", entity: "ent-tasnim", title: "Eski durdona", keywords: ["durdona"], listPrice: 44_000, printUnit: 21_000, status: "OUT_OF_PRINT", monthlyQty: 0, activeFrom: "2025-01-01", noSales: true },
-  { key: "T20", entity: "ent-tasnim", title: "Ummon durlari", keywords: ["ummon"], listPrice: 80_000, printUnit: 30_000, status: "ACTIVE", monthlyQty: 480, activeFrom: "2025-01-01", abc: "A" },
-  { key: "T21", entity: "ent-tasnim", title: "Kichik risola", keywords: ["risola"], listPrice: 22_000, printUnit: 20_000, status: "ACTIVE", monthlyQty: 25, activeFrom: "2025-01-01", abc: "C" },
-  { key: "H1", entity: "ent-tahlil", title: "Moliyaviy savodxonlik", keywords: ["moliya", "savodxonlik"], listPrice: 66_000, printUnit: 26_000, status: "ACTIVE", monthlyQty: 190, activeFrom: "2025-02-01" },
-  { key: "H2", entity: "ent-tahlil", title: "Startap yo'li", keywords: ["startap"], listPrice: 64_000, printUnit: 27_000, status: "ACTIVE", monthlyQty: 120, activeFrom: "2025-03-01" },
-  { key: "H5", entity: "ent-tahlil", title: "Lider daftari", keywords: ["lider"], listPrice: 59_000, printUnit: 25_000, status: "ACTIVE", monthlyQty: 130, activeFrom: "2025-01-01" },
-  { key: "H8", entity: "ent-tahlil", title: "Iqtisodiy tahlil", keywords: ["iqtisod"], listPrice: 70_000, printUnit: 29_000, status: "ACTIVE", monthlyQty: 90, activeFrom: "2025-04-01" },
-  { key: "H9", entity: "ent-tahlil", title: "Boylik psixologiyasi", keywords: ["boylik"], listPrice: 63_000, printUnit: 26_000, status: "ACTIVE", monthlyQty: 160, activeFrom: "2025-02-01" },
-  { key: "H13", entity: "ent-tahlil", title: "Soliq qo'llanmasi", keywords: ["soliq"], listPrice: 72_000, printUnit: 30_000, status: "ACTIVE", monthlyQty: 0, activeFrom: "2025-01-01", noSales: true },
+  { key: "T20", entity: "ent-tasnim", title: "Saodatli oila bayoni", keywords: ["saodatli"], listPrice: 44000, printUnit: 39600, status: "ACTIVE", monthlyQty: 556, activeFrom: "2025-02-01", abc: "A" },
+  { key: "T1", entity: "ent-tasnim", title: "Psixologik urush", keywords: ["psixologik"], listPrice: 56000, printUnit: 50400, status: "ACTIVE", monthlyQty: 162, activeFrom: "2025-02-01", editions: [{ no: 1, run: 5000 }, { no: 2, run: 7000 }] },
+  { key: "T6", entity: "ent-tasnim", title: "Bolakay ko'rsichqon tulki va tulpor", keywords: ["bolakay"], listPrice: 66000, printUnit: 59400, status: "ACTIVE", monthlyQty: 120, activeFrom: "2025-02-01" },
+  { key: "T7", entity: "ent-tasnim", title: "Namoz", keywords: ["namoz"], listPrice: 54000, printUnit: 48600, status: "ACTIVE", monthlyQty: 142, activeFrom: "2025-02-01" },
+  { key: "T5", entity: "ent-tasnim", title: "Nil", keywords: ["nil"], listPrice: 46000, printUnit: 41400, status: "ACTIVE", monthlyQty: 153, activeFrom: "2025-02-01" },
+  { key: "T12", entity: "ent-tasnim", title: "Sotilayotgan kasalliklar", keywords: ["sotilayotgan"], listPrice: 56000, printUnit: 50400, status: "ACTIVE", monthlyQty: 105, activeFrom: "2025-02-01", textbook: true },
+  { key: "T11", entity: "ent-tasnim", title: "Xolid ibn Valid", keywords: ["xolid"], listPrice: 49000, printUnit: 44100, status: "ACTIVE", monthlyQty: 110, activeFrom: "2025-02-01" },
+  { key: "T14", entity: "ent-tasnim", title: "Temir tovon", keywords: ["temir"], listPrice: 56000, printUnit: 50400, status: "ACTIVE", format: "AUDIO", monthlyQty: 74, activeFrom: "2025-02-01", audioRights: true },
+  { key: "T15", entity: "ent-tasnim", title: "Gunohning rangi", keywords: ["gunohning"], listPrice: 33000, printUnit: 29700, status: "ACTIVE", monthlyQty: 95, activeFrom: "2025-02-01" },
+  { key: "T9", entity: "ent-tasnim", title: "Payg'ambarlar qissasi lotin", keywords: ["payg'ambarlar"], listPrice: 36000, printUnit: 32400, status: "ACTIVE", monthlyQty: 86, activeFrom: "2025-02-01" },
+  { key: "T13", entity: "ent-tasnim", title: "Gilos daraxti bilan oramizdagi masofa", keywords: ["gilos"], listPrice: 42000, printUnit: 37800, status: "ACTIVE", monthlyQty: 33, activeFrom: "2026-05-01" },
+  { key: "T2", entity: "ent-tasnim", title: "Inshiroh", keywords: ["inshiroh"], listPrice: 30000, printUnit: 27000, status: "ACTIVE", monthlyQty: 1, activeFrom: "2025-01-01", deadStock: true },
+  { key: "T21", entity: "ent-tasnim", title: "Nikoh", keywords: ["nikoh"], listPrice: 25000, printUnit: 22500, status: "ACTIVE", monthlyQty: 18, activeFrom: "2025-02-01", abc: "C" },
+  { key: "T17", entity: "ent-tasnim", title: "Zamzamning onasi", keywords: ["zamzamning"], listPrice: 44000, printUnit: 39600, status: "REVIEW", monthlyQty: 0, activeFrom: "2025-02-01", noSales: true },
+  { key: "T18", entity: "ent-tasnim", title: "Olcha daraxti bilan", keywords: ["olcha"], listPrice: 30000, printUnit: 27000, status: "OUT_OF_PRINT", monthlyQty: 0, activeFrom: "2025-02-01", noSales: true },
+  { key: "H1", entity: "ent-tahlil", title: "O'limdan keyingi yangi", keywords: ["o'limdan"], listPrice: 47000, printUnit: 42300, status: "ACTIVE", monthlyQty: 95, activeFrom: "2025-02-01" },
+  { key: "H2", entity: "ent-tahlil", title: "Yashamoq sokinlik istar", keywords: ["yashamoq"], listPrice: 30000, printUnit: 27000, status: "ACTIVE", monthlyQty: 57, activeFrom: "2025-02-01" },
+  { key: "H5", entity: "ent-tahlil", title: "Farzand", keywords: ["farzand"], listPrice: 38000, printUnit: 34200, status: "ACTIVE", monthlyQty: 44, activeFrom: "2025-02-01" },
+  { key: "H8", entity: "ent-tahlil", title: "Dengiz bo'risi", keywords: ["dengiz"], listPrice: 49000, printUnit: 44100, status: "ACTIVE", monthlyQty: 46, activeFrom: "2025-02-01" },
+  { key: "H9", entity: "ent-tahlil", title: "Yassiyurt", keywords: ["yassiyurt"], listPrice: 36000, printUnit: 32400, status: "ACTIVE", monthlyQty: 71, activeFrom: "2025-02-01" },
+  { key: "H13", entity: "ent-tahlil", title: "Keyingi 100 yil", keywords: ["keyingi"], listPrice: 40000, printUnit: 36000, status: "ACTIVE", monthlyQty: 0, activeFrom: "2025-02-01", noSales: true },
 ];
 
 function seasonality(dt: Date, textbook: boolean): number {
@@ -304,7 +303,7 @@ async function sales(products: ProductRow[]) {
       const mid = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 15));
 
       // Channel mix: 55% agent, 20% distributor, 15% retail, 10% marketplace.
-      const disc = { agent: 0.5, dist: 0.55, retail: 0.35, mp: 0.4 };
+      const disc = { agent: 0.08, dist: 0.06, retail: 0.03, mp: 0.1 };
       const agent = agents[(orderSeq + b.key.length) % 3];
       const parts: { channelId: string; partnerId: string | null; qty: number; discount: number; paid: number; customer?: string }[] = [
         { channelId: CH.dist, partnerId: agent, qty: Math.round(monthQty * 0.55), discount: disc.agent, paid: agentProfile[agent] },
