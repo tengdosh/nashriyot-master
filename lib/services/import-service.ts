@@ -33,10 +33,15 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 const num = (v: unknown) => (typeof v === "number" ? v : 0);
 const date = (v: unknown) => (v instanceof Date ? v : new Date());
 
-/** Discount cell → a rate in [0,0.99]: a value ≤1 is already a rate, else 0. */
+/**
+ * Discount cell → a rate. Accepts both forms real files use: a fraction
+ * (0.05 → 5%) or a percentage integer (5 → 5%, 12 → 12%). Anything ≤1 is taken
+ * as a fraction; 1–100 as a percentage; out of range → 0. Capped below 1.
+ */
 function toRate(discount: number): Prisma.Decimal {
-  if (discount > 0 && discount <= 1) return D(discount);
-  return D(0);
+  if (discount <= 0) return D(0);
+  const rate = discount <= 1 ? discount : discount <= 100 ? discount / 100 : 0;
+  return D(Math.min(rate, 0.99));
 }
 
 export type ImportSummary = {
@@ -221,7 +226,7 @@ export async function commitImport(
         }
       }
       return s;
-    }),
+    }, { timeout: 600_000, maxWait: 60_000 }),
   );
 
   return { ...summary, committed: true, errors };

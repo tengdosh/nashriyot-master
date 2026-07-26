@@ -48,3 +48,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+import-csv/
+*.xlsx
+Foyda_Zarar_2026.html
