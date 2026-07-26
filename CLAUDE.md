@@ -218,6 +218,23 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   amount(±tol) + date(±days); `applyMatch` only stamps `reconStatus=MATCHED` +
   `bankRef`. It never creates/moves a payment. The recon UI's "Toʻlovlardan"
   button mirrors pending payments into a bank file purely as a demo affordance.
+- **The Telegram bot (M16) is READ-ONLY and DB-blind.** `bot/` (grammY, long
+  polling) never imports Prisma; every number comes from `GET /api/v1/reports/:name`
+  gated by `Bearer REPORTS_API_TOKEN` + `x-user-id`. The report layer
+  (`reports-service.runReport`) re-checks BOTH `reports.read` (base gate) AND the
+  report's specific permission, and forces the acting user's entity scope in —
+  the caller can never widen it. The whitelisted catalog is the single source of
+  truth (`lib/reports-catalog.ts`, pure, 100%): menu, Zod params, and Claude
+  tool-use `input_schema` all derive from it. Free-question AI is Claude tool-use
+  restricted to those tools (no SQL, "don't guess" system prompt); it degrades to
+  the menu when `ANTHROPIC_API_KEY` is unset (same null-safe pattern as ai-client).
+- **Chat linking:** one-time 6-digit code, **HMAC-SHA256(AUTH_SECRET)** hashed
+  (deterministic → O(1) lookup, unlike argon2), 10-min TTL, single-use
+  (`TelegramLinkCode`). Generated on `/profile` (session), redeemed by the bot via
+  `POST /api/v1/telegram/link`. The bot reads its identity+menu from
+  **`GET /api/v1/telegram/me?chatId=`** (its OWN route — not `/link`; the bot's
+  api.ts hard-codes `/me`). Token-less bot **idles** (setInterval), never
+  `process.exit`, so `restart: unless-stopped` can't crash-loop it.
 - **DEPLOY TARGET 172.30.0.36 IS THIS SAME MACHINE** (hostname `madaniyat`; its
   `~/nashriyot-master` git HEAD == local HEAD; `~/nashriyot-deploy` is visible
   locally). No SSH/sshpass needed — deploy is entirely local: `rsync -a --delete
