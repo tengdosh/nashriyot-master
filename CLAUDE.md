@@ -206,6 +206,28 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   four-state view and consumable by `fifoIssue` without double-counting.
 - **Write-offs and stock corrections are typed ADJUST, never OUT**, so nothing
   but a real sale can ever land in the "Sotilgan" figure.
+- **Finance centre (M15) never recomputes a sealed number — it aggregates.**
+  Cash is Σ IN − Σ OUT of `Payment` per entity; AR/AP totals are the same
+  `amountUZS − paidUZS` outstanding the AR/AP screens show. `Payable.paidUZS`
+  (added M15) mirrors `Receivable.paidUZS`: partial pays flip status to PARTIAL,
+  full to PAID, an overpay is refused and a PAID row can't be paid again. Paying
+  an AP writes a `Payment` with `direction=OUT, refType="Payable"` — that OUT is
+  what later shows up as PENDING in reconciliation.
+- **Reconciliation is match-only, never a money mutation.** `reconAutoMatch`
+  (pure, greedy one-to-one) pairs a PENDING payment to a bank row on partner +
+  amount(±tol) + date(±days); `applyMatch` only stamps `reconStatus=MATCHED` +
+  `bankRef`. It never creates/moves a payment. The recon UI's "Toʻlovlardan"
+  button mirrors pending payments into a bank file purely as a demo affordance.
+- **DEPLOY TARGET 172.30.0.36 IS THIS SAME MACHINE** (hostname `madaniyat`; its
+  `~/nashriyot-master` git HEAD == local HEAD; `~/nashriyot-deploy` is visible
+  locally). No SSH/sshpass needed — deploy is entirely local: `rsync -a --delete
+  --exclude node_modules --exclude .next --exclude .git --exclude .env
+  nashriyot-master/ nashriyot-deploy/` → in deploy `prisma migrate deploy`
+  (**prod DB is separate: localhost:5533**, dev is 5433) → `prisma generate` →
+  `npm run build` → copy `.next/static`, `public`, `node_modules/.prisma` into
+  `.next/standalone/` → `sudo systemctl restart nashriyot-prod` (port 3100).
+  Sudo password `p1234567m`. Verify: authenticated curl (Auth.js csrf →
+  callback/credentials, seed login `director@nashriyot.uz` / `Parol123!`).
 
 ---
 
