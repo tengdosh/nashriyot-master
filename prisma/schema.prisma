@@ -306,6 +306,26 @@ enum PriceRecStatus {
   REJECTED
 }
 
+// AI-4 (M17 GEO / M18 audio). AI recommends → human approves → act.
+enum GeoStatus {
+  DRAFT // AI recommendation, awaiting approval
+  APPROVED // applied to the title's live SEO fields
+}
+
+enum AudioJobStatus {
+  BLOCKED // contract lacks AUDIO rights
+  QUEUED // chapters split, awaiting synthesis
+  PROCESSING
+  READY // all chapters synthesized + assembled
+  FAILED
+}
+
+enum AudioChapterStatus {
+  QUEUED
+  SYNTHESIZED
+  FAILED
+}
+
 enum NotificationType {
   ROP
   DEAD_STOCK
@@ -349,6 +369,9 @@ model User {
   writeDownsApproved  WriteDown[]        @relation("WriteDownChecker")
   savedReports        SavedReport[]
   dashboardLayout     DashboardLayout?
+  geoCreated          GeoAnnotation[]    @relation("GeoCreatedBy")
+  geoApproved         GeoAnnotation[]    @relation("GeoApprovedBy")
+  audioJobsCreated    AudioJob[]         @relation("AudioCreatedBy")
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -539,6 +562,8 @@ model Title {
   productionTasks ProductionTask[]
   leads           Lead[]             @relation("LeadInterest")
   plScenarios     PlScenario[]
+  geoAnnotation   GeoAnnotation?
+  audioJobs       AudioJob[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -1338,6 +1363,83 @@ model PriceRecommendation {
 
   @@index([productId])
   @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI-4: GEO annotations (M17) + audiobook jobs (M18)
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * A Claude-generated SEO/GEO recommendation for a title (spec v2 §7.2). One row
+ * per title; the AI writes a DRAFT, a human with ai.apply approves it, and only
+ * then is it written back to the title's live SEO fields.
+ */
+model GeoAnnotation {
+  id              String    @id @default(cuid())
+  titleId         String    @unique
+  status          GeoStatus @default(DRAFT)
+  metaTitle       String
+  metaDescription String
+  keywords        String[]
+  jsonLd          Json // schema.org/Book markup
+  blurb           String? // short marketing paragraph
+  promptVersion   String
+  model           String
+  createdById     String?
+  approvedById    String?
+  approvedAt      DateTime?
+
+  title      Title @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  createdBy  User? @relation("GeoCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("GeoApprovedBy", fields: [approvedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/**
+ * An audiobook synthesis job (spec v2 §7.3). Blocked unless the title has an
+ * ACTIVE contract carrying AUDIO rights. The TTS provider is swappable; without
+ * a configured provider chapters stay QUEUED (graceful degradation).
+ */
+model AudioJob {
+  id          String         @id @default(cuid())
+  titleId     String
+  voice       String
+  lang        String         @default("uz")
+  provider    String         @default("none")
+  status      AudioJobStatus @default(QUEUED)
+  note        String?
+  createdById String?
+
+  title     Title          @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  createdBy User?          @relation("AudioCreatedBy", fields: [createdById], references: [id])
+  chapters  AudioChapter[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([titleId])
+  @@index([status])
+}
+
+model AudioChapter {
+  id          String             @id @default(cuid())
+  jobId       String
+  idx         Int
+  heading     String
+  charCount   Int
+  durationSec Int
+  status      AudioChapterStatus @default(QUEUED)
+  previewUrl  String?
+
+  job AudioJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
