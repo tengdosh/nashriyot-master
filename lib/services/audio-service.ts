@@ -88,7 +88,7 @@ export async function synthesizeJob(jobId: string, userId: string) {
   return runWithAudit({ userId }, async () => {
     for (const ch of job.chapters) {
       if (ch.status === "SYNTHESIZED") continue;
-      const res = await provider.synthesize({ text: ch.heading, voice: job.voice, lang: job.lang });
+      const res = await provider.synthesize({ id: ch.id, text: ch.heading, voice: job.voice, lang: job.lang });
       if (res) {
         await prisma.audioChapter.update({
           where: { id: ch.id },
