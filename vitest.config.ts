@@ -26,6 +26,7 @@ export default defineConfig({
         "lib/royalty.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/analytics.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/dashboard.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/pricing.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },

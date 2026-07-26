@@ -154,6 +154,21 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   layout. A saved layout is re-normalized server-side on every save (untrusted
   client input). Every widget reads ONLY materialized views / notifications /
   tasks and self-guards its data fetch, so one failing widget never breaks the board.
+- **AI service is stateless and never touches the DB.** The Next app sends
+  history/points as JSON to the Python FastAPI container (`AI_SERVICE_URL`, bearer
+  `AI_SERVICE_TOKEN`); `lib/ai-client.ts` reads env at call time and returns null
+  on any error/timeout (graceful degradation — pages show "AI unavailable", never
+  crash). Rebuild it with `sg docker -c "docker compose build ai-service"` then
+  `up -d`.
+- **AI pattern: recommend → human approve → act. AI never mutates on its own.**
+  A forecast persists but `applyForecastToReorder` is BLOCKED when MAPE>40%
+  (`forecastConfidence` LOW); a price is a `PriceRecommendation` that `acceptPrice`
+  (ai.apply) applies, refusing any suggestion below the floor. The floor is P_min
+  today; swap to `getDecisionFloor` once M12 lands (marked in pricing-service).
+- **M10 scope: AI-1 forecast + AI-2 pricing are built and tested.** GEO (Claude
+  API) and audio (TTS) are deferred stub pages — they need real external keys not
+  available in this environment, and are the spec's own last rollout step (AI-4).
+  When building GEO, load the `claude-api` skill first.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
