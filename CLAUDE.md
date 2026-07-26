@@ -169,6 +169,13 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   API) and audio (TTS) are deferred stub pages — they need real external keys not
   available in this environment, and are the spec's own last rollout step (AI-4).
   When building GEO, load the `claude-api` skill first.
+- **System roles (DIRECTOR, ADMIN) are immutable in the role matrix.** `lib/admin.isSystemRole`
+  guards both the UI checkboxes and `setRolePermissions` — they always hold every
+  permission. `setRolePermissions` also drops permission codes that don't exist.
+- **Invited/reset users get a strong temp password shown ONCE** (`generateTempPassword`,
+  argon2-hashed, plaintext never stored). Every admin write goes through
+  `runWithAudit`, so the admin screens are themselves in the audit log; the log
+  viewer diffs before/after via `lib/admin.auditDiff` (ignores timestamps).
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
