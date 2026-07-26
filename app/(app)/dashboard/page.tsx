@@ -1,25 +1,44 @@
 import { requirePermission } from "@/lib/rbac";
-import { KpiCardSkeleton } from "@/components/shared/kpi-card";
+import { getVisibleWidgets } from "@/lib/services/dashboard-service";
+import { DashboardBoard, type BoardWidget } from "./dashboard-board";
+import { renderWidget } from "./widgets";
 
-// Placeholder dashboard (spec Task 4 §4): 3 KpiCard skeletons inside the shell.
-// The real widget board is built in Task 17 (M1).
+export const metadata = { title: "Boshqaruv paneli" };
+
 export default async function DashboardPage() {
   const user = await requirePermission("dashboard.read");
 
+  const layout = await getVisibleWidgets(user.id, user.roles, user.permissions);
+
+  // Render every widget on the server (each reads only views/notifications and
+  // self-guards its data fetch), then hand the nodes to the client board which
+  // owns ordering / width / show-hide without ever re-fetching.
+  const widgets: BoardWidget[] = await Promise.all(
+    layout.map(async (w) => ({
+      id: w.id,
+      w: w.w,
+      hidden: !!w.hidden,
+      title: w.title,
+      node: await renderWidget(w.id, { roles: user.roles }),
+    })),
+  );
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Boshqaruv paneli</h1>
-        <p className="text-muted-foreground">
-          Xush kelibsiz, {user.name}. Toʻliq vidjetlar M1 (17-bosqich) da quriladi.
+        <p className="text-sm text-muted-foreground">
+          Xush kelibsiz, {user.name}. Vidjetlar faqat materiallashtirilgan koʻrinishlardan oʻqiydi.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCardSkeleton />
-        <KpiCardSkeleton />
-        <KpiCardSkeleton />
-      </div>
+      {widgets.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+          Sizning rolingiz uchun vidjet yoʻq.
+        </p>
+      ) : (
+        <DashboardBoard widgets={widgets} />
+      )}
     </div>
   );
 }

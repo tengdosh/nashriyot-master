@@ -347,6 +347,7 @@ model User {
   writeDownsCreated   WriteDown[]      @relation("WriteDownMaker")
   writeDownsApproved  WriteDown[]      @relation("WriteDownChecker")
   savedReports        SavedReport[]
+  dashboardLayout     DashboardLayout?
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -1341,6 +1342,22 @@ model Setting {
   id    String @id @default(cuid())
   key   String @unique
   value Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * Per-user dashboard layout (spec v1 §5.9). `widgets` is an ordered array of
+ * { id, w, hidden } — the recipe, not the data. Absent = the role default
+ * (seeded in `settings` under dashboard.layout.<ROLE>).
+ */
+model DashboardLayout {
+  id      String @id @default(cuid())
+  userId  String @unique
+  widgets Json
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

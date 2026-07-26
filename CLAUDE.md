@@ -143,6 +143,17 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   --from-schema-datasource … --to-schema-datamodel … --script` into a
   timestamped folder, then `deploy`. Materialized views live in a hand-written
   migration.
+- **Dashboard drag-drop is native HTML5, NOT dnd-kit** (pinned deviation from
+  the spec's named library — keeps M1 dependency-free, consistent with the other
+  no-extra-dep decisions). 12-col grid; a widget's `w`/order/hidden are client
+  state, but widget CONTENT is server-rendered and passed to the board as React
+  nodes, so dragging never re-fetches. Layout is a per-user JSONB override
+  (`DashboardLayout`) on top of a code-derived `roleDefaultLayout`.
+- **Widget permissions are authorization, layout is preference.** `resolveVisibleWidgets`
+  drops any widget whose permission the user lacks regardless of the stored
+  layout. A saved layout is re-normalized server-side on every save (untrusted
+  client input). Every widget reads ONLY materialized views / notifications /
+  tasks and self-guards its data fetch, so one failing widget never breaks the board.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
