@@ -128,6 +128,21 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   token, so never assume middleware ran for it.
 - **Seeded author login:** `author@nashriyot.uz` (role AUTHOR, linked to
   `contrib-author-demo`). It has `portal.read` only — no admin app access.
+- **Analytics reads materialized views ONLY, never live tables.** `mv_monthly_sales`
+  / `mv_title_kpi` / `mv_ar_aging` are raw-SQL objects (not Prisma-managed),
+  refreshed by `analytics-service.refreshViews()` (nightly `refresh-views` job,
+  runs LAST so it captures the other jobs, + a manual admin button). A report can
+  lag the last refresh — that is by design; heavy aggregation never hits the
+  request path. Each view has a UNIQUE index so REFRESH CONCURRENTLY works.
+- **P&L by entity reconciles to a summed Jami row** (`analytics.pnlRollup`):
+  revenue/COGS from `mv_monthly_sales`, royalty from SENT statements by title
+  entity, FIXED from `cost_entries`. Margins divide by revenue, 0 when revenue is
+  0 (never NaN). Golden import check: ~2.64 bln revenue → ~735 mln net, ~27.8%.
+- **New migrations are applied with `prisma migrate deploy`, not `dev`** (the
+  sandbox is non-interactive). Generate the SQL with `prisma migrate diff
+  --from-schema-datasource … --to-schema-datamodel … --script` into a
+  timestamped folder, then `deploy`. Materialized views live in a hand-written
+  migration.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.

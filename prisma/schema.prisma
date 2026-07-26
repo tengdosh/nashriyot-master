@@ -346,6 +346,7 @@ model User {
   telegramLink        TelegramLink?
   writeDownsCreated   WriteDown[]      @relation("WriteDownMaker")
   writeDownsApproved  WriteDown[]      @relation("WriteDownChecker")
+  savedReports        SavedReport[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -1343,6 +1344,25 @@ model Setting {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/**
+ * A saved /analytics constructor query (spec v1 §5.8: "saqlangan hisobotlar").
+ * `spec` holds { measure, dimension, secondaryDimension?, from, to } — the recipe,
+ * not the data, so a saved report always re-runs against fresh views.
+ */
+model SavedReport {
+  id          String  @id @default(cuid())
+  name        String
+  spec        Json
+  createdById String?
+
+  createdBy User? @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdById])
 }
 
 model TelegramLink {

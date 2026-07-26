@@ -1,6 +1,7 @@
 import { scanDeadStock } from "@/lib/services/dead-stock-service";
 import { recalcAbc, runRopMonitor } from "@/lib/services/reorder-service";
 import { runArOverdueScan } from "@/lib/services/receivables-service";
+import { refreshViews } from "@/lib/services/analytics-service";
 
 /**
  * Job registry (spec v1 §6.2–6.3). Every job is a plain async function so it can
@@ -9,7 +10,7 @@ import { runArOverdueScan } from "@/lib/services/receivables-service";
  * Nightly order matters: ABC first (it sets the service level each SKU's ROP is
  * computed at), then the ROP monitor, then the dead-stock scan.
  */
-export type JobName = "abc" | "rop-monitor" | "dead-stock-scan" | "ar-overdue";
+export type JobName = "abc" | "rop-monitor" | "dead-stock-scan" | "ar-overdue" | "refresh-views";
 
 export type JobResult = { job: JobName; startedAt: Date; finishedAt: Date; result: unknown };
 
@@ -36,6 +37,11 @@ export const JOBS: Record<JobName, { schedule: string; label: string; run: JobFn
     label: "Muddati oʻtgan qarzlar (AR)",
     run: (userId, now) => runArOverdueScan({ userId, now }),
   },
+  "refresh-views": {
+    schedule: "04:30",
+    label: "Analitika view'larini yangilash",
+    run: (userId) => refreshViews(userId),
+  },
 };
 
 export const JOB_NAMES = Object.keys(JOBS) as JobName[];
@@ -52,7 +58,8 @@ export async function runJob(name: JobName, userId: string, now?: Date): Promise
 
 /** The full nightly chain, in dependency order. */
 export async function runNightly(userId: string, now?: Date): Promise<JobResult[]> {
-  const order: JobName[] = ["abc", "rop-monitor", "dead-stock-scan", "ar-overdue"];
+  // Refresh views LAST so it captures everything the other jobs just wrote.
+  const order: JobName[] = ["abc", "rop-monitor", "dead-stock-scan", "ar-overdue", "refresh-views"];
   const results: JobResult[] = [];
   for (const name of order) {
     results.push(await runJob(name, userId, now));
