@@ -218,6 +218,20 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   amount(±tol) + date(±days); `applyMatch` only stamps `reconStatus=MATCHED` +
   `bankRef`. It never creates/moves a payment. The recon UI's "Toʻlovlardan"
   button mirrors pending payments into a bank file purely as a demo affordance.
+- **CSV import (M19) is dry-run-first and catalog-idempotent.** `lib/import-map.ts`
+  (pure, 100%) parses CSV + coerces uz dates/money + normalizes titles; two
+  templates (kirimlar, sotuv). `import-service.previewImport` NEVER writes (counts
+  + per-row errors); `commitImport` is one audited transaction. Dedup keys:
+  **Title by `normalizeTitleKey` (cyrill→latin fold → one work), Product by
+  `importProductSku` (script-PRESERVING → latin+cyrill = two SKUs under one
+  title), Partner by name.** kirimlar → `stockIn` FIFO layers (unitCost =
+  Summa_dona) in the first PUBLISHER entity's MAIN warehouse; sotuv → historical
+  **SHIPPED** orders written DIRECTLY (bypassing the live sales state machine —
+  P_min/credit checks must not gate migrated facts) with sealed
+  discountRate/cogsUnit(=Kirim)/cmUnit; channel from Holat (Ulgurji→DISTRIBUTOR,
+  else RETAIL). Orders are NOT deduped — run sotuv import once. Real xlsx→CSV
+  files (Sotuv_2025-2026, kirimlar, Foyda_Zarar_2026 = the M9 P&L golden ~2.64bln
+  →735mln) still pending; engine is fixture-tested.
 - **The Telegram bot (M16) is READ-ONLY and DB-blind.** `bot/` (grammY, long
   polling) never imports Prisma; every number comes from `GET /api/v1/reports/:name`
   gated by `Bearer REPORTS_API_TOKEN` + `x-user-id`. The report layer
