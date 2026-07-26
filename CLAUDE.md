@@ -218,6 +218,21 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   amount(±tol) + date(±days); `applyMatch` only stamps `reconStatus=MATCHED` +
   `bankRef`. It never creates/moves a payment. The recon UI's "Toʻlovlardan"
   button mirrors pending payments into a bank file purely as a demo affordance.
+- **GEO (M17) & audio (M18) follow AI recommend→approve→act and degrade to a
+  warning banner without external keys.** GEO: `lib/ai/claude.ts` (`@anthropic-ai/sdk`,
+  reads `ANTHROPIC_API_KEY` at call time, returns null on no-key/error/timeout —
+  same contract as `lib/ai-client.ts`) → `geo-service.generateGeoRecommendation`
+  writes a DRAFT `GeoAnnotation`; `approveGeoAnnotation` (ai.apply) flips it
+  APPROVED **and writes metaDescription/keywords back to the live Title**. Prompt
+  is versioned in `lib/prompts/geo.ts` (`GEO_PROMPT_VERSION`, stored on every row),
+  output Zod-validated (`parseGeoResult`). Default model `claude-opus-5` (env
+  `APP_AI_MODEL`). Audio: `createAudioJob` **BLOCKS unless an ACTIVE contract has
+  `audioRights`** (`AudioRightsError`); `lib/audio.ts` (pure, 100%) splits the
+  manuscript into chapters; `lib/tts/adapter.ts` is a provider-swappable seam
+  whose default `"none"` provider returns null → chapters stay QUEUED with a note
+  (env `TTS_PROVIDER` picks a real adapter later). Gen/split = ai.read, approve/
+  synth = ai.apply. Both are the spec's AI-4 final step — they build & test fully
+  without keys; only live output needs the key.
 - **CSV import (M19) is dry-run-first and catalog-idempotent.** `lib/import-map.ts`
   (pure, 100%) parses CSV + coerces uz dates/money + normalizes titles; two
   templates (kirimlar, sotuv). `import-service.previewImport` NEVER writes (counts
