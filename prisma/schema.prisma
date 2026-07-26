@@ -1256,6 +1256,7 @@ model Payable {
   currency  Currency      @default(UZS)
   rate      Decimal       @default(1) @db.Decimal(14, 4)
   amountUZS Decimal       @db.Decimal(18, 2)
+  paidUZS   Decimal       @default(0) @db.Decimal(18, 2)
   dueDate   DateTime?
   status    PayableStatus @default(OPEN)
   refType   String?

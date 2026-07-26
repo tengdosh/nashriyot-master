@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Payable" ADD COLUMN     "paidUZS" DECIMAL(18,2) NOT NULL DEFAULT 0;
+
