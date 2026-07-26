@@ -187,6 +187,20 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   else the P_min/FIFO fallback.** Dead-stock values frozen stock at reportCost
   when a snapshot exists, else FIFO — so the golden 59.45M test still holds with
   no snapshot. Break-even alert (`daysUntilCross <= 30`) links to /costing/[id].
+- **A transfer (M13) is an internal SALE across entities.** On RECEIVE the goods
+  leave the sender (FIFO OUT — counts as sold) and enter the receiver as a NEW
+  FIFO layer priced at `transferPrice` (base − sealed discount) — the receiving
+  entity's cost basis, NOT the original print cost. The P_min floor
+  (decisionCost, else P_min/FIFO) applies to internal trade too; override needs
+  `transfers.override` and is audited. The inter-entity ledger nets RECEIVED
+  transfers against `EntitySettlement`s (`lib/transfer.nettedLedger`; the value
+  source always nets as creditor).
+- **REDEPLOY REQUIRES `npx prisma generate` ON THE SERVER after any schema
+  change**, before `npm run build` — the server's generated client is stale
+  otherwise and the build fails with "Property 'X' does not exist". Full server
+  redeploy: rsync → `prisma migrate deploy` → **`prisma generate`** → `npm run
+  build` → copy static/public/.prisma into `.next/standalone` → `systemctl
+  restart nashriyot-prod`.
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
