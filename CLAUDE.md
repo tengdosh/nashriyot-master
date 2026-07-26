@@ -277,6 +277,19 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
 
 ---
 
+## Demo world
+`npm run seed:demo` (`prisma/seed-demo.ts`) loads a **deterministic, idempotent**
+demo world on top of the base seed — every `demo-`-prefixed row is wiped and
+recreated, so re-running is safe. ~22 titles / 23 products, ~1240 shipped orders
+across 18 months (seasonality + sealed cogs/cm), AR/AP/payments (agent DSO
+profiles: Akmal paid-up, Bahodir over-limit, Sardor slow + 95-day consignment;
+Istanbul USD payable, Kamolot commission, one PENDING recon), 3 royalty runs
+(2 SENT + 1 DRAFT), lead campaigns (4.2x / 0.6x ROI), a T2 dead-stock flag, 8
+dashboard notifications, and 18 months of FIXED cost_entries (Jul-2025+ rent
++10%). Refreshes the materialized views at the end. **Loaded on the prod DB
+(5533)** — the live deployment shows real numbers across every module. Run it
+again anytime to reset the demo world.
+
 ## Local dev notes (this environment)
 - Node 22 (NodeSource) + npm. Prisma pinned to **6.x** (classic
   `prisma-client-js`; import `{ PrismaClient } from "@prisma/client"`).
