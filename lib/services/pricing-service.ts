@@ -5,6 +5,7 @@ import { elasticity } from "@/lib/ai-client";
 import { suggestPrice } from "@/lib/pricing";
 import { minViablePrice } from "@/lib/finance";
 import { fifoAvgUnitCost } from "./inventory-service";
+import { getDecisionFloor } from "./costing-service";
 
 /**
  * Dynamic pricing service (spec v1 §6.7 / §5.10). Gets the elasticity from the
@@ -53,11 +54,18 @@ export async function suggestPriceFor(productId: string, userId: string) {
     return { skipped: true as const, reason: "Elastiklikni baholash uchun narx xilma-xilligi yetarli emas" };
   }
 
-  const unitCost = await fifoAvgUnitCost(productId);
-  // Floor = P_min at zero discount/royalty (unit cost must be recoverable).
-  const floor = unitCost.gt(0)
-    ? minViablePrice({ uc: unitCost, discountRate: 0, royaltyRate: 0 })
-    : new Prisma.Decimal(product.listPrice).times(0.5);
+  // Floor = today's sunk-free decisionCost from the live cost engine (M12).
+  // Falls back to P_min over the FIFO unit cost when no snapshot exists yet.
+  const decisionFloor = await getDecisionFloor(productId);
+  let floor: Prisma.Decimal;
+  if (decisionFloor && decisionFloor.gt(0)) {
+    floor = decisionFloor;
+  } else {
+    const unitCost = await fifoAvgUnitCost(productId);
+    floor = unitCost.gt(0)
+      ? minViablePrice({ uc: unitCost, discountRate: 0, royaltyRate: 0 })
+      : new Prisma.Decimal(product.listPrice).times(0.5);
+  }
 
   const refQty = points.reduce((a, p) => a + p.qty, 0) / (points.length || 1);
   const s = suggestPrice({

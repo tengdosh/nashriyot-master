@@ -10,6 +10,7 @@ import {
 } from "@/lib/inventory-analytics";
 import { getInventorySettings, type InventorySettings } from "./inventory-settings";
 import { fifoAvgUnitCost, fifoIssue, lastSaleAgeDays, quantityOnHand, InventoryError } from "./inventory-service";
+import { getReportCost } from "./costing-service";
 
 export class WriteDownError extends Error {
   constructor(message: string) {
@@ -114,12 +115,17 @@ export async function scanDeadStock(
       const existing = await prisma.deadStockFlag.findUnique({ where: { productId: p.id } });
       if (existing?.status === "WRITTEN_OFF") continue;
 
-      const [qtyOnHand, ageDays, unitCost, signals] = await Promise.all([
+      const [qtyOnHand, ageDays, fifoCost, reportCost, signals] = await Promise.all([
         quantityOnHand(p.id),
         lastSaleAgeDays(p.id, now),
         fifoAvgUnitCost(p.id),
+        getReportCost(p.id),
         backlistSignals(p.id, now),
       ]);
+      // Value frozen stock at the full reportCost (unique + print + accrued fixed)
+      // when the live cost engine (M12) has a snapshot; otherwise the FIFO print
+      // cost. Spec v1 §6.2: "uc … v2'da reportCost'ga o'tadi".
+      const unitCost = reportCost && reportCost.gt(0) ? reportCost : fifoCost;
 
       const valuableBacklist = isValuableBacklist({
         cm12: signals.cm12,

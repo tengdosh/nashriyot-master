@@ -176,6 +176,17 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   argon2-hashed, plaintext never stored). Every admin write goes through
   `runWithAudit`, so the admin screens are themselves in the audit log; the log
   viewer diffs before/after via `lib/admin.auditDiff` (ignores timestamps).
+- **Live cost engine (M12): three layers stay SEPARATE, combined only in
+  daily_unit_cost.** `reportCost = unique + print + accruedFixed` (accounting);
+  `decisionCost = print + daily holding` (today's pricing floor, sunk-free) — the
+  unique/fixed layers NEVER enter decisionCost. `costing-service.computeDailyCost`
+  upserts by [productId, date] and accrues the fixed layer onto the prior day's
+  `allocFixedCum` (idempotent same-day re-run). The `costing-snapshot` job runs
+  FIRST in the nightly chain (dead-stock reads reportCost from it).
+- **Pricing floor = getDecisionFloor (M12 decisionCost) when a snapshot exists,
+  else the P_min/FIFO fallback.** Dead-stock values frozen stock at reportCost
+  when a snapshot exists, else FIFO — so the golden 59.45M test still holds with
+  no snapshot. Break-even alert (`daysUntilCross <= 30`) links to /costing/[id].
 - **A sellable RETURN is its own FIFO layer**, not a second IN row
   (`inventory-service.LAYER_TYPES`) — so returned copies stay countable in the
   four-state view and consumable by `fifoIssue` without double-counting.
