@@ -218,6 +218,16 @@ Architectural deviations from the literal spec, locked in (rationale in git hist
   amount(±tol) + date(±days); `applyMatch` only stamps `reconStatus=MATCHED` +
   `bankRef`. It never creates/moves a payment. The recon UI's "Toʻlovlardan"
   button mirrors pending payments into a bank file purely as a demo affordance.
+- **AI is provider-agnostic: Anthropic-first, OpenAI fallback (both live-capable).**
+  `lib/ai/claude.ts` `generateJson` and `bot/src/ai.ts` `answerQuestion` try
+  `ANTHROPIC_API_KEY` (Claude, the spec default) then `OPENAI_API_KEY`
+  (`gpt-4o-mini`: chat json_object for GEO, function-calling for the bot). TTS
+  (`lib/tts/adapter.ts`) auto-selects the `openai` provider (`tts-1`) when
+  `OPENAI_API_KEY` is set, writing mp3 to `AUDIO_DIR` served by
+  `/api/audio/[id]` (ai.read gated). **Prod runs on OpenAI** (user supplied an
+  OpenAI key, no Anthropic key). `openai@5` installed with `--legacy-peer-deps`
+  (its zod peer is optional; project is on zod 4). Swap in an `sk-ant-…` key any
+  time and Claude takes precedence automatically — no code change.
 - **GEO (M17) & audio (M18) follow AI recommend→approve→act and degrade to a
   warning banner without external keys.** GEO: `lib/ai/claude.ts` (`@anthropic-ai/sdk`,
   reads `ANTHROPIC_API_KEY` at call time, returns null on no-key/error/timeout —
