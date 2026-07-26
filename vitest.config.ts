@@ -29,6 +29,7 @@ export default defineConfig({
         "lib/pricing.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/admin.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
         "lib/costing.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
+        "lib/transfer.ts": { statements: 100, branches: 100, functions: 100, lines: 100 },
       },
     },
   },

@@ -431,14 +431,16 @@ model Entity {
   name String
   type EntityType
 
-  usersWithAccess User[]          @relation("UserEntityAccess")
+  usersWithAccess User[]             @relation("UserEntityAccess")
   warehouses      Warehouse[]
   costEntries     CostEntry[]
   salesOrders     SalesOrder[]
   receivables     Receivable[]
   payments        Payment[]
-  transfersFrom   TransferOrder[] @relation("TransferFrom")
-  transfersTo     TransferOrder[] @relation("TransferTo")
+  transfersFrom   TransferOrder[]    @relation("TransferFrom")
+  transfersTo     TransferOrder[]    @relation("TransferTo")
+  settlementsFrom EntitySettlement[] @relation("SettlementFrom")
+  settlementsTo   EntitySettlement[] @relation("SettlementTo")
   titles          Title[]
 
   createdAt  DateTime  @default(now())
@@ -1017,6 +1019,29 @@ model TransferOrder {
   @@index([fromEntityId])
   @@index([toEntityId])
   @@index([status])
+}
+
+/**
+ * An internal payment between two entities that settles part of the
+ * inter-entity balance built up by RECEIVED transfer orders (spec v2 §5.2
+ * "ichki to'lovlar"). Ledger balance(A→B) = Σ received transfers A→B −
+ * Σ settlements B→A.
+ */
+model EntitySettlement {
+  id           String   @id @default(cuid())
+  fromEntityId String // payer
+  toEntityId   String // payee
+  amountUZS    Decimal  @db.Decimal(18, 2)
+  note         String?
+  date         DateTime @default(now())
+
+  fromEntity Entity @relation("SettlementFrom", fields: [fromEntityId], references: [id])
+  toEntity   Entity @relation("SettlementTo", fields: [toEntityId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([fromEntityId])
+  @@index([toEntityId])
 }
 
 model TransferOrderLine {
