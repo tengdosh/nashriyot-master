@@ -29,22 +29,29 @@ export default async function AnalyticsPage() {
   const user = await requirePermission("analytics.read");
   const { from, to } = yearWindow();
 
-  const [pnl, channels, top, slowest, dead, saved, mvRows] = await Promise.all([
+  const [pnl, channels, top, slowest, dead, saved, importRows] = await Promise.all([
     pnlByEntity(from, to),
     channelProfitability(),
     topTitles(10),
     slowestTitles(10),
     deadStockDynamics(),
     listSavedReports(),
+    // Import-only: salesOrders via "Import (%)" channels, net after discount (feeRate=0 on import channels)
     prisma.$queryRaw<{ month: string; net_rev: string }[]>`
-      SELECT month, SUM(net_revenue)::text AS net_rev
-      FROM mv_monthly_sales
-      WHERE month >= '2026-01' AND month <= '2026-06'
-      GROUP BY month ORDER BY month
+      SELECT TO_CHAR(o."shippedDate", 'YYYY-MM') AS month,
+             SUM(l."unitPrice" * (1 - l."discountRate") * l.qty)::text AS net_rev
+      FROM "SalesOrder" o
+      JOIN "SalesOrderLine" l ON l."orderId" = o.id
+      JOIN "SalesChannel" c ON c.id = o."channelId"
+      WHERE o."shippedDate" >= '2026-01-01'
+        AND o."shippedDate" < '2026-07-01'
+        AND c.name LIKE 'Import (%)'
+      GROUP BY TO_CHAR(o."shippedDate", 'YYYY-MM')
+      ORDER BY 1
     `,
   ]);
 
-  const pnlReconcileData: PnlReconcileRow[] = mvRows.map((r) => ({
+  const pnlReconcileData: PnlReconcileRow[] = importRows.map((r) => ({
     month: r.month,
     revenue: Number(r.net_rev),
   }));

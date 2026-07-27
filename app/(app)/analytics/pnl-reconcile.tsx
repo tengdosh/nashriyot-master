@@ -19,7 +19,7 @@ import { InfoHint } from "@/components/shared/info-hint";
 import { formatUZS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-// Etalon raqamlari (Foyda_Zarar_2026.html dan)
+// Etalon: Foyda_Zarar_2026.html — Tasnim + Tahlil jami, yanvar–iyun 2026
 const BENCHMARK: Record<string, number> = {
   "2026-01": 368_304_000,
   "2026-02": 318_696_000,
@@ -40,18 +40,18 @@ const MONTH_LABELS: Record<string, string> = {
 
 const CAUSES = [
   {
-    title: "sotuv.csv — faqat Tasnim ma'lumotlari",
-    body: "1 714 qatorning barchasi Tasnim nashriyotiga tegishli. Tahlil nashriyotining ~823 mln so'mlik savdo ma'lumotlari import qilinmagan.",
+    title: "CSV to'liqsizligi (asosiy sabab)",
+    body: "sotuv.csv da 843 ta tranzaksiya bor, jami 803–804 mln so'm. Bu 2026 H1 uchun real biznesning faqat ~30.5%i. Qolgan ~69.5% (≈1.84 mlrd) CSV eksportga kirmagan — to'liq CSV eksport kerak.",
     color: "border-l-destructive",
   },
   {
-    title: "Demo seed kichik hajm (~48.8%)",
-    body: "seed-demo.ts dagi monthlyQty qiymatlari etalon savdo hajmining taxminan yarmi. Masalan T20: 556 o'rniga 1 200 dona/oy kerak.",
+    title: "Entity mapping xatosi (tuzatildi)",
+    body: "Import service barcha buyurtmalarni birinchi PUBLISHER entityga (Tahlil) biriktirirdi. Tuzatish: har bir kitobning title.entityId'dan olinadi — Tasnim/Tahlil to'g'ri farqlanadi.",
     color: "border-l-warning",
   },
   {
-    title: "mv_monthly_sales kanal to'lovini chegiradi",
-    body: "MV net_revenue = gross minus kanal komissiyasi. Etalon esa gross tushum ko'rsatadi — bu metodologik farq -5% dan -15% qo'shimcha og'ish beradi.",
+    title: "mv feeRate chegirilishi (minor)",
+    body: "mv_monthly_sales net_revenue = chegirma × kanal komissiyasi (feeRate). Etalon faqat chegirmadan keyingi summa. Import kanallari feeRate=0 bo'lgani uchun bu farq import ma'lumotlariga ta'sir qilmaydi.",
     color: "border-l-primary",
   },
 ] as const;
@@ -59,9 +59,7 @@ const CAUSES = [
 export type PnlReconcileRow = { month: string; revenue: number };
 
 export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
-  // Barcha oylar: etalon yoki haqiqiyda bor bo'lgan oylar
   const months = Object.keys(BENCHMARK).sort();
-
   const actualByMonth = new Map(actual.map((r) => [r.month, r.revenue]));
 
   const rows = months.map((m) => {
@@ -80,23 +78,22 @@ export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold tracking-tight">Etalon vs Haqiqiy</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Etalon vs Import ma&#39;lumotlari</h2>
         <span className="text-sm text-muted-foreground">2026 H1</span>
         <InfoHint>
-          Etalon — Foyda_Zarar_2026.html (gross tushum). Haqiqiy —
-          mv_monthly_sales (net tushum, kanal to&#39;lovlari ayirilgan). Farq
-          metodologik va ma&#39;lumot yetishmasligi sabablari bilan izohlanadi.
+          Etalon — Foyda_Zarar_2026.html (Tasnim + Tahlil jami, chegirmadan keyingi).
+          Import — faqat sotuv.csv orqali yuklangan buyurtmalar (Import kanal, feeRate=0).
+          Demo seed ma&#39;lumotlari bu taqqoslashga kirmaydi.
         </InfoHint>
       </div>
 
-      {/* Jadval */}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Oy</TableHead>
-              <TableHead className="text-right">Etalon</TableHead>
-              <TableHead className="text-right">Haqiqiy (MV)</TableHead>
+              <TableHead className="text-right">Etalon (HTML)</TableHead>
+              <TableHead className="text-right">Import-only</TableHead>
               <TableHead className="text-right">Farq</TableHead>
               <TableHead className="text-right">% Farq</TableHead>
             </TableRow>
@@ -111,7 +108,7 @@ export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
                   {formatUZS(r.benchmark)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatUZS(r.fact)}
+                  {r.fact > 0 ? formatUZS(r.fact) : <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell
                   className={cn(
@@ -133,7 +130,6 @@ export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
                 </TableCell>
               </TableRow>
             ))}
-            {/* Jami qatori */}
             <TableRow className="font-semibold bg-muted/50">
               <TableCell>JAMI</TableCell>
               <TableCell className="text-right tabular-nums">
@@ -165,7 +161,6 @@ export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
         </Table>
       </div>
 
-      {/* Sabab kartochalari */}
       <div className="grid gap-3 sm:grid-cols-3">
         {CAUSES.map((c, i) => (
           <Card key={i} className={cn("border-l-4", c.color)} size="sm">

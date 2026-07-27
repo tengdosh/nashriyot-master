@@ -214,9 +214,21 @@ export async function commitImport(
           const cogsUnit = D(num(rec.cost));
           const cmUnit = netUnit.minus(cogsUnit);
           const when = date(rec.date);
+          // Use the product's owning entity (and its MAIN warehouse) so Tasnim/Tahlil books
+          // are recorded under the correct entity rather than always defaulting to the first
+          // PUBLISHER entity returned alphabetically.
+          const productTitle = await tx.product.findUnique({
+            where: { id: productId },
+            select: { title: { select: { entityId: true } } },
+          });
+          const orderEntityId = productTitle?.title.entityId ?? entity.id;
+          const orderWarehouse =
+            orderEntityId === entity.id
+              ? warehouse
+              : ((await tx.warehouse.findFirst({ where: { entityId: orderEntityId, type: "MAIN", archivedAt: null } })) ?? warehouse);
           await tx.salesOrder.create({
             data: {
-              channelId, entityId: entity.id, warehouseId: warehouse.id, partnerId,
+              channelId, entityId: orderEntityId, warehouseId: orderWarehouse.id, partnerId,
               status: "SHIPPED", orderDate: when, shippedDate: when,
               lines: { create: [{ productId, qty, unitPrice: D(price), discountRate: rate, cogsUnit, cmUnit }] },
             },
