@@ -179,6 +179,7 @@ const SETTING_KEYS = [
   "serviceLevelZ",
   "orderCost",
   "minTurnover",
+  "goLiveDate",
 ] as const;
 
 export async function getAdminSettings() {
@@ -188,6 +189,10 @@ export async function getAdminSettings() {
     const v = byKey.get(k);
     return typeof v === "number" ? v : d;
   };
+  const str = (k: string): string | null => {
+    const v = byKey.get(k);
+    return typeof v === "string" ? v : null;
+  };
   return {
     vatRate: num("vatRate", 0),
     deadStockDays: num("deadStockDays", 120),
@@ -196,13 +201,19 @@ export async function getAdminSettings() {
     serviceLevelZ: num("serviceLevelZ", 1.65),
     orderCost: num("orderCost", 500_000),
     minTurnover: num("minTurnover", 0.5),
+    goLiveDate: str("goLiveDate"),
   };
 }
 
 export async function saveAdminSettings(input: AdminSettingsInput, actorId: string) {
   return runWithAudit({ userId: actorId }, async () => {
     for (const key of SETTING_KEYS) {
-      const value = input[key];
+      const raw = input[key as keyof AdminSettingsInput];
+      if (raw == null) {
+        await prisma.setting.deleteMany({ where: { key } });
+        continue;
+      }
+      const value = raw as string | number;
       await prisma.setting.upsert({
         where: { key },
         update: { value },

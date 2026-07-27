@@ -27,6 +27,8 @@ export const adminSettingsSchema = z.object({
   serviceLevelZ: z.number().min(0).max(5),
   orderCost: z.number().nonnegative(),
   minTurnover: z.number().min(0),
+  // goLiveDate: YYYY-MM-DD — periods before this month show a "tarixiy" warning in M9 reports
+  goLiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
 export type InviteUserInput = z.infer<typeof inviteUserSchema>;

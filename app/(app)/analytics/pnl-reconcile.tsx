@@ -58,7 +58,14 @@ const CAUSES = [
 
 export type PnlReconcileRow = { month: string; revenue: number };
 
-export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
+export function PnlReconcile({
+  actual,
+  goLiveDateMonth,
+}: {
+  actual: PnlReconcileRow[];
+  /** YYYY-MM — months BEFORE this are shown with a tarixiy warning */
+  goLiveDateMonth?: string | null;
+}) {
   const months = Object.keys(BENCHMARK).sort();
   const actualByMonth = new Map(actual.map((r) => [r.month, r.revenue]));
 
@@ -102,7 +109,14 @@ export function PnlReconcile({ actual }: { actual: PnlReconcileRow[] }) {
             {rows.map((r) => (
               <TableRow key={r.month}>
                 <TableCell className="font-medium">
-                  {MONTH_LABELS[r.month] ?? r.month}
+                  <span className="inline-flex flex-wrap items-center gap-1.5">
+                    {MONTH_LABELS[r.month] ?? r.month}
+                    {goLiveDateMonth && r.month < goLiveDateMonth && (
+                      <span className="inline-flex items-center gap-0.5 rounded-sm bg-warning/15 px-1.5 py-0.5 text-[10px] font-medium text-warning leading-none">
+                        ⚠ tarixiy
+                      </span>
+                    )}
+                  </span>
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatUZS(r.benchmark)}

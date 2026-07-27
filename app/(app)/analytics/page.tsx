@@ -8,6 +8,7 @@ import {
   listSavedReports,
 } from "@/lib/services/analytics-service";
 import { prisma } from "@/lib/db";
+import { getAdminSettings } from "@/lib/services/admin-service";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { InfoHint } from "@/components/shared/info-hint";
 import { formatUZS } from "@/lib/format";
@@ -29,7 +30,7 @@ export default async function AnalyticsPage() {
   const user = await requirePermission("analytics.read");
   const { from, to } = yearWindow();
 
-  const [pnl, channels, top, slowest, dead, saved, importRows] = await Promise.all([
+  const [pnl, channels, top, slowest, dead, saved, importRows, adminSettings] = await Promise.all([
     pnlByEntity(from, to),
     channelProfitability(),
     topTitles(10),
@@ -49,6 +50,7 @@ export default async function AnalyticsPage() {
       GROUP BY TO_CHAR(o."shippedDate", 'YYYY-MM')
       ORDER BY 1
     `,
+    getAdminSettings(),
   ]);
 
   const pnlReconcileData: PnlReconcileRow[] = importRows.map((r) => ({
@@ -129,7 +131,10 @@ export default async function AnalyticsPage() {
 
       <PrebuiltReports data={prebuilt} />
 
-      <PnlReconcile actual={pnlReconcileData} />
+      <PnlReconcile
+        actual={pnlReconcileData}
+        goLiveDateMonth={adminSettings.goLiveDate?.slice(0, 7) ?? null}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { FileUp, CheckCircle2, AlertTriangle, ScanLine } from "lucide-react";
+import { FileUp, CheckCircle2, AlertTriangle, ScanLine, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { InfoHint } from "@/components/shared/info-hint";
@@ -11,6 +11,14 @@ import { formatUZS, formatNumber } from "@/lib/format";
 import { previewImportAction, commitImportAction } from "./actions";
 
 type Template = "kirimlar" | "sotuv";
+
+type Coverage = {
+  sotuvOrders: number;
+  sotuvLastDate: string | null;
+  kirimlarLayers: number;
+  kirimlarTotalQty: number;
+  kirimlarLastDate: string | null;
+};
 
 const HEADERS: Record<Template, string> = {
   kirimlar: "Sana, Kitoblar, Miqdor, Narxi, Chegirma, Summa_dona, Umumiy, Yetkazib beruvchi",
@@ -28,7 +36,13 @@ type Summary = {
 };
 type RowError = { row: number; message: string };
 
-export function ImportClient() {
+function fmtDate(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+}
+
+export function ImportClient({ coverage }: { coverage: Coverage }) {
   const [pending, startTransition] = React.useTransition();
   const [template, setTemplate] = React.useState<Template>("kirimlar");
   const [csv, setCsv] = React.useState("");
@@ -81,6 +95,44 @@ export function ImportClient() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Import qamrovi — persistent DB-derived stats */}
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <div className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+          <Database className="size-4 text-muted-foreground" />
+          Import qamrovi
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-md border bg-background p-3">
+            <div className="mb-1 text-xs font-medium text-muted-foreground">Sotuv (buyurtmalar)</div>
+            <div className="flex items-end gap-4">
+              <div>
+                <div className="text-xl font-semibold tabular-nums">{formatNumber(coverage.sotuvOrders)}</div>
+                <div className="text-xs text-muted-foreground">yuklangan buyurtma</div>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Oxirgi: {fmtDate(coverage.sotuvLastDate)}
+              </div>
+            </div>
+          </div>
+          <div className="rounded-md border bg-background p-3">
+            <div className="mb-1 text-xs font-medium text-muted-foreground">Kirimlar (FIFO qatlamlari)</div>
+            <div className="flex items-end gap-4">
+              <div>
+                <div className="text-xl font-semibold tabular-nums">{formatNumber(coverage.kirimlarLayers)}</div>
+                <div className="text-xs text-muted-foreground">qatlam · {formatNumber(coverage.kirimlarTotalQty)} dona</div>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Oxirgi: {fmtDate(coverage.kirimlarLastDate)}
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Bu raqamlar bazada mavjud Import kanal buyurtmalari va FIFO IN harakatlaridan hisoblanadi.
+          Fayl qatorlari va o&rsquo;tkazib yuborilgan soni sinov rejimida (Tekshirish) ko&rsquo;rinadi.
+        </p>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">

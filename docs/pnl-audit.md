@@ -120,3 +120,22 @@ Import kanallari (`Import (Chakana)`, `Import (Ulgurji)`) `feeRate = 0` bilan ya
 | Hisobot formula | To'g'ri — import uchun feeRate=0 | — |
 
 **Keyingi qadam:** To'liq sotuv CSV eksporti (Tasnim + Tahlil, barcha kanallar, H1 2026) yetkazib berilganda, qayta import bajariladi va ushbu audit yangilanadi.
+
+---
+
+## Yakuniy xulosa
+
+**Audit xulosasi** (2026-07-27):
+
+> **69.5% farq — import mexanizmi yoki formulaning xatosi emas; manba faylning qamrovi cheklangan.**
+
+Tizim import mexanizmi to'g'ri ishlaydi:
+- `Summa` (CSV) va `unitPrice × qty × (1−discountRate)` (DB) ta'riflari bir xil ✓
+- `mv_monthly_sales` MV feeRate deducts are irrelevant for Import channels (feeRate = 0) ✓
+- Ichki transferlar import qatorlariga aralashmagan (0 ta) ✓
+
+**Topilgan va tuzatilgan xato — entity mapping:**  
+Import service barcha sotuv buyurtmalarini birinchi PUBLISHER entityga (alfavit bo'yicha "Tahlil nashriyoti") biriktirirdi. Tasnim kitoblari ham noto'g'ri entityga kirgan. Tuzatildi: `lib/services/import-service.ts` yangilandi — har bir kitob `product.title.entityId` orqali o'zining to'g'ri entitysiga biriktiriladi (commit `9432049`).
+
+**Gap sababi — CSV eksport qamrovi:**  
+sotuv.csv da 843 qator = 2026-H1 uchun real savdoning taxminan **30.5%i** qamrab olingan. Qolgan **~69.5%** (≈1.84 mlrd so'm) CSV fayliga kirmagan. Bu ma'lumotlarni mapping lug'atini to'ldirish yoki formula tuzatish bilan qayta hosil qilib bo'lmaydi — faqat to'liq CSV eksport bilan hal bo'ladi.
