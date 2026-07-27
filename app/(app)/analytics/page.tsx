@@ -7,6 +7,7 @@ import {
   deadStockDynamics,
   listSavedReports,
 } from "@/lib/services/analytics-service";
+import { prisma } from "@/lib/db";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { InfoHint } from "@/components/shared/info-hint";
 import { formatUZS } from "@/lib/format";
@@ -14,6 +15,7 @@ import { AnalyticsConstructor, type SavedReportView } from "./constructor";
 import { PnlTable, type PnlView } from "./pnl-table";
 import { PrebuiltReports, type PrebuiltData } from "./prebuilt";
 import { RefreshViewsButton } from "./refresh-button";
+import { PnlReconcile, type PnlReconcileRow } from "./pnl-reconcile";
 
 export const metadata = { title: "Analitika" };
 
@@ -27,14 +29,25 @@ export default async function AnalyticsPage() {
   const user = await requirePermission("analytics.read");
   const { from, to } = yearWindow();
 
-  const [pnl, channels, top, slowest, dead, saved] = await Promise.all([
+  const [pnl, channels, top, slowest, dead, saved, mvRows] = await Promise.all([
     pnlByEntity(from, to),
     channelProfitability(),
     topTitles(10),
     slowestTitles(10),
     deadStockDynamics(),
     listSavedReports(),
+    prisma.$queryRaw<{ month: string; net_rev: string }[]>`
+      SELECT month, SUM(net_revenue)::text AS net_rev
+      FROM mv_monthly_sales
+      WHERE month >= '2026-01' AND month <= '2026-06'
+      GROUP BY month ORDER BY month
+    `,
   ]);
+
+  const pnlReconcileData: PnlReconcileRow[] = mvRows.map((r) => ({
+    month: r.month,
+    revenue: Number(r.net_rev),
+  }));
 
   const pnlView: PnlView = {
     rows: pnl.rows.map(serializePnl),
@@ -108,6 +121,8 @@ export default async function AnalyticsPage() {
       <AnalyticsConstructor saved={savedView} canSave={user.permissions.includes("analytics.read")} />
 
       <PrebuiltReports data={prebuilt} />
+
+      <PnlReconcile actual={pnlReconcileData} />
     </div>
   );
 }

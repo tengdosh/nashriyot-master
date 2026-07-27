@@ -1,0 +1,20 @@
+{
+  "name": "Nashriyot Master",
+  "short_name": "NashriyotM",
+  "description": "Nashriyot boshqaruv tizimi",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#800e13",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" },
+    { "src": "/icons/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tez sotuv", "url": "/quick/sale", "icons": [{ "src": "/icons/sale-96.svg", "sizes": "96x96" }] },
+    { "name": "Tez to'lov", "url": "/quick/payment", "icons": [{ "src": "/icons/payment-96.svg", "sizes": "96x96" }] },
+    { "name": "Tez xarajat", "url": "/quick/expense", "icons": [{ "src": "/icons/expense-96.svg", "sizes": "96x96" }] },
+    { "name": "Tez transfer", "url": "/quick/transfer", "icons": [{ "src": "/icons/transfer-96.svg", "sizes": "96x96" }] }
+  ]
+}

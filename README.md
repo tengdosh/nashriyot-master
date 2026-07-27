@@ -213,9 +213,66 @@ erDiagram
 
 > Standalone (FK-siz, `refId` polimorf): `DiscountRule`, `Notification`, `Setting`.
 
-## Holat
+## Holat (2026-07-27)
 
-**1-bosqich (skelet)** va **2-bosqich (DB sxemasi + seed)** tayyor:
-40 model migratsiya qilingan, base seed (3 subʼyekt, AGENT omborlar, 9 rol,
-5 foydalanuvchi, 17 hamkor, 4 kanal, discount_rules) idempotent oʻtadi.
-Keyingi bosqich — Auth.js v5 + RBAC (v1 §3.3). Qarang: [docs/spec.md](docs/spec.md).
+### Milestonelar
+
+| # | Milestone | Holat | Commit |
+|---|-----------|-------|--------|
+| M1 | Boshqaruv paneli (12-ustun vidjet) | ✅ Tugallandi | `4888016` |
+| M2 | Sarlavhalar va nashrlar | ✅ Tugallandi | `bcd8e0e` |
+| M3 | Moliyaviy yadro + P&L editor | ✅ Tugallandi | `a10bc4a` |
+| M4 | Ishlab chiqarish (print orderlar) | ✅ Tugallandi | `31c5d7d` |
+| M5 | Ombor + konsignatsiya | ✅ Tugallandi | `a838cb6` |
+| M6 | Sotuv & Marja | ✅ Tugallandi | `30f9000` |
+| M7 | Huquqlar & Royalti | ✅ Tugallandi | `814814d` |
+| M8 | Muallif portali | ✅ Tugallandi | `cb7e32a` |
+| M9 | Analitika & BI | ✅ Tugallandi | `aad467c` |
+| M10 | AI Studio (prognoz, dinamik narx) | ✅ Tugallandi | `4888016` |
+| M11 | Administratsiya | ✅ Tugallandi | `a959cfa` |
+| M12 | Jonli tan-narx dvigateli | ✅ Tugallandi | `363017f` |
+| M13 | Sub'ektlar va ichki savdo | ✅ Tugallandi | `fa611f7` |
+| M14 | CRM & Lidlar | ✅ Tugallandi | `0a1dfa4` |
+| M15 | Moliya markazi (AR/AP) | ✅ Tugallandi | `128fefa` |
+| M16 | Telegram hisobot boti | ✅ Tugallandi | `2043429` |
+| M17 | GEO annotatsiya (SEO) | ✅ Tugallandi | `88dcbfc` |
+| M18 | Audiokitob (TTS) | ✅ Tugallandi | `faf1820` |
+| M19 | CSV import | ✅ Tugallandi | `dd61318` |
+| M20 | E2E test to'plami (9 ssenarey) | ✅ Tugallandi | `pending` |
+| M26 | Mobil PWA + tez kiritish | ✅ Tugallandi | `pending` |
+| M27 | Recurring costs | ✅ Tugallandi | `pending` |
+| M28 | Telegram kiritish (DRAFT) | ✅ Tugallandi | `pending` |
+
+### Texnik stek
+
+| Komponent | Texnologiya | Versiya |
+|-----------|-------------|---------|
+| Frontend | Next.js (App Router) | 15.5.21 |
+| Styling | Tailwind v4 + shadcn/ui (Base UI) | 4.x |
+| ORM | Prisma (classic provider) | 6.19.3 |
+| Auth | Auth.js v5 | beta.32 |
+| AI | OpenAI + Claude API | latest |
+| Bot | grammY | 1.x |
+| DB | PostgreSQL 16 (port 5433) | 16 |
+| Cache | Redis 7 (port 6380) | 7 |
+| AI Servis | FastAPI Python 3.12 (port 8001) | 0.1.0 |
+
+### Ish boshlash
+
+```bash
+# 1. Environment
+cp .env.example .env  # to'ldiring
+
+# 2. Docker
+docker compose up -d
+
+# 3. DB + seed
+npm run db:migrate
+npm run db:seed
+npm run seed:demo     # demo ma'lumotlar
+
+# 4. Dev server
+npm run dev
+
+# Login: director@tasnim.uz / Parol123!
+```

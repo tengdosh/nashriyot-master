@@ -372,6 +372,7 @@ model User {
   geoCreated          GeoAnnotation[]    @relation("GeoCreatedBy")
   geoApproved         GeoAnnotation[]    @relation("GeoApprovedBy")
   audioJobsCreated    AudioJob[]         @relation("AudioCreatedBy")
+  telegramEntryTokens TelegramEntryToken[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -466,6 +467,7 @@ model Entity {
   settlementsFrom EntitySettlement[] @relation("SettlementFrom")
   settlementsTo   EntitySettlement[] @relation("SettlementTo")
   titles          Title[]
+  recurringCosts  RecurringCost[]
 
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
@@ -697,6 +699,9 @@ model CostEntry {
   // Set when a BUYOUT contract generated this entry — makes activation
   // idempotent and the author cost traceable back to its contract.
   contractId String?
+  // Generic back-reference: 'RecurringCost', 'TelegramEntry', etc.
+  refType    String?
+  refId      String?
 
   entity   Entity?   @relation(fields: [entityId], references: [id])
   title    Title?    @relation(fields: [titleId], references: [id])
@@ -713,6 +718,7 @@ model CostEntry {
   @@index([editionId])
   @@index([date])
   @@index([campaign])
+  @@index([refType, refId])
 }
 
 model DailyUnitCost {
@@ -1539,6 +1545,61 @@ model TelegramLinkCode {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recurring costs (M27) — auto-generate CostEntry rows each month
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * A recurring cost template. Every month the `recurring-costs` job creates a
+ * CostEntry for each active template (idempotent: one CostEntry per rc per
+ * month, keyed by refType='RecurringCost'/refId). startMonth/endMonth are
+ * "YYYY-MM" strings (plain comparison works because format is fixed-width).
+ */
+model RecurringCost {
+  id         String       @id @default(cuid())
+  entityId   String
+  entity     Entity       @relation(fields: [entityId], references: [id])
+  label      String
+  amount     Decimal      @db.Decimal(18, 2)
+  currency   Currency     @default(UZS)
+  rate       Decimal      @default(1) @db.Decimal(14, 4)
+  category   CostCategory @default(BOSHQA)
+  scope      String       @default("FIXED") // FIXED = same every month, VAR = may change
+  dayOfMonth Int          @default(1)       // day of month the CostEntry is dated
+  startMonth String                         // "YYYY-MM" inclusive start
+  endMonth   String?                        // "YYYY-MM" inclusive end, null = indefinite
+  lastRunAt  DateTime?
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([entityId])
+  @@index([startMonth])
+  @@index([archivedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Telegram entry tokens (M27-E) — allow bot users to create DRAFT entries
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * A short-lived token that grants the Telegram bot write-access on behalf of
+ * a specific user (scope = 'entry.write'). The token is generated on the
+ * platform and redeemed by the bot; only DRAFTs are created — final approval
+ * is always done in the web UI.
+ */
+model TelegramEntryToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope     String    @default("entry.write")
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])

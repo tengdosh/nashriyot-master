@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { Sidebar } from "@/components/shell/sidebar";
 import { Topbar } from "@/components/shell/topbar";
+import { PwaRegister } from "@/components/pwa-register";
 
 // Shell for all protected modules. Middleware already gates access; this also
 // loads the accessible subjects for the topbar entity switcher.
@@ -21,6 +22,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
+      <PwaRegister />
       <Sidebar permissions={user.permissions} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar user={{ name: user.name, email: user.email }} entities={entities} />

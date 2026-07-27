@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users, ShieldCheck, SlidersHorizontal, ScrollText, Plug, Upload, ArrowRight } from "lucide-react";
+import { Users, ShieldCheck, SlidersHorizontal, ScrollText, Plug, Upload, ArrowRight, RefreshCw } from "lucide-react";
 import { requirePermission } from "@/lib/rbac";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -11,6 +11,7 @@ const SECTIONS = [
   { href: "/admin/roles", icon: ShieldCheck, perm: "admin.roles", title: "Rollar va ruxsatlar", desc: "9 rol × ruxsatlar matritsasi", ready: true },
   { href: "/admin/settings", icon: SlidersHorizontal, perm: "admin.settings", title: "Sozlamalar", desc: "QQS, dead-stock, saqlash %, ROI, Z, tariflar", ready: true },
   { href: "/admin/audit", icon: ScrollText, perm: "admin.audit", title: "Audit jurnali", desc: "Barcha o'zgarishlar, before/after diff", ready: true },
+  { href: "/admin/recurring-costs", icon: RefreshCw, perm: "admin.settings", title: "Takroriy xarajatlar", desc: "Oylik avtomatik CostEntry shablonlari (ijara, oylik, kommunal...)", ready: true },
   { href: "/admin/integrations", icon: Plug, perm: "admin.integrations", title: "Integratsiyalar", desc: "AI health, kalitlar, mappinglar", ready: false },
   { href: "/admin/import", icon: Upload, perm: "admin.import", title: "Import", desc: "CSV shablonlar, validatsiya, tranzaksion", ready: false },
 ];

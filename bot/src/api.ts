@@ -72,6 +72,58 @@ export async function getPushes(sinceIso: string): Promise<ChatPush[]> {
   return body.data ?? [];
 }
 
+// ── Telegram entry write (M27-E) ───────────────────────────────────────────
+
+export type ParsedEntry = {
+  type:          string;
+  amount:        number | null;
+  currency:      string;
+  description:   string;
+  date:          string | null;
+  partnerName:   string | null;
+  productName:   string | null;
+  qty:           number | null;
+  unitPrice:     number | null;
+  unknownFields: string[];
+};
+
+/**
+ * Ask the platform to parse free text into a structured entry card.
+ * The bot shows this card to the user for confirmation — nothing is saved.
+ */
+export async function parseEntry(
+  chatId: string,
+  type: string,
+  text: string,
+): Promise<{ data: ParsedEntry | null; error?: string }> {
+  const res = await fetch(`${BASE}/api/v1/telegram/entry`, {
+    method:  "POST",
+    headers: authHeaders(),
+    body:    JSON.stringify({ chatId, action: "parse", type, text }),
+  });
+  const body = (await res.json()) as { data: ParsedEntry | null; error?: string };
+  return body;
+}
+
+/**
+ * Save a confirmed parsed entry as a DRAFT on the platform.
+ * Returns the created record id.
+ */
+export async function saveEntry(
+  chatId:          string,
+  type:            string,
+  parsed:          ParsedEntry,
+  clientRequestId: string,
+): Promise<{ ok: boolean; id?: string; kind?: string; error?: string }> {
+  const res = await fetch(`${BASE}/api/v1/telegram/entry`, {
+    method:  "POST",
+    headers: authHeaders(),
+    body:    JSON.stringify({ chatId, action: "save", type, parsed, clientRequestId }),
+  });
+  const body = (await res.json()) as { data?: { id: string; kind: string }; error?: string };
+  return res.ok ? { ok: true, id: body.data?.id, kind: body.data?.kind } : { ok: false, error: body.error };
+}
+
 export type ReportResponse = { data: unknown; generatedAt: string; params: unknown; error?: string };
 
 /** Run a whitelisted report as the given user. */

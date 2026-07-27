@@ -3,6 +3,7 @@ import { recalcAbc, runRopMonitor } from "@/lib/services/reorder-service";
 import { runArOverdueScan } from "@/lib/services/receivables-service";
 import { refreshViews } from "@/lib/services/analytics-service";
 import { snapshotAllCosts } from "@/lib/services/costing-service";
+import { runRecurringCosts } from "@/jobs/recurring-costs";
 
 /**
  * Job registry (spec v1 §6.2–6.3). Every job is a plain async function so it can
@@ -17,7 +18,8 @@ export type JobName =
   | "dead-stock-scan"
   | "ar-overdue"
   | "costing-snapshot"
-  | "refresh-views";
+  | "refresh-views"
+  | "recurring-costs";
 
 export type JobResult = { job: JobName; startedAt: Date; finishedAt: Date; result: unknown };
 
@@ -54,6 +56,11 @@ export const JOBS: Record<JobName, { schedule: string; label: string; run: JobFn
     label: "Analitika view'larini yangilash",
     run: (userId) => refreshViews(userId),
   },
+  "recurring-costs": {
+    schedule: "00:30",
+    label: "Oylik takroriy xarajatlar",
+    run: (userId, now) => runRecurringCosts(userId, now),
+  },
 };
 
 export const JOB_NAMES = Object.keys(JOBS) as JobName[];
@@ -73,6 +80,7 @@ export async function runNightly(userId: string, now?: Date): Promise<JobResult[
   // Costing snapshot FIRST (dead-stock reads reportCost from it); refresh views
   // LAST so it captures everything the other jobs just wrote.
   const order: JobName[] = [
+    "recurring-costs",  // before costing-snapshot so new entries are included
     "costing-snapshot",
     "abc",
     "rop-monitor",

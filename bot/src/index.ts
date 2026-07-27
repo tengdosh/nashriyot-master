@@ -1,4 +1,5 @@
 import { Bot, InlineKeyboard } from "grammy";
+import { randomUUID } from "node:crypto";
 import { isReportName, splitMessage, type ReportName } from "@/lib/reports-catalog";
 import { renderReport } from "@/lib/bot-format";
 import * as api from "./api";
@@ -12,6 +13,39 @@ import { answerQuestion, aiEnabled } from "./ai";
 
 const AI_DAILY_LIMIT = Number(process.env.BOT_AI_DAILY_LIMIT ?? 50);
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+// ── Entry flow state (in-memory, per chat) ────────────────────────────────────
+type EntryStep = "choosing" | "entering" | "confirming";
+type EntryFlowState = {
+  step:            EntryStep;
+  type?:           string;
+  parsed?:         api.ParsedEntry;
+  clientRequestId: string;
+};
+const entryFlow = new Map<string, EntryFlowState>();
+
+const ENTRY_TYPE_LABELS: Record<string, string> = {
+  sale:     "Sotuv",
+  payment:  "To'lov",
+  expense:  "Xarajat",
+  transfer: "Transfer",
+};
+
+function formatEntryCard(parsed: api.ParsedEntry): string {
+  const lines: string[] = [`*${ENTRY_TYPE_LABELS[parsed.type] ?? parsed.type}*`];
+  if (parsed.amount != null) lines.push(`💰 Summa: ${parsed.amount.toLocaleString()} ${parsed.currency}`);
+  if (parsed.partnerName)    lines.push(`👤 Kontragent: ${parsed.partnerName}`);
+  if (parsed.productName)    lines.push(`📦 Mahsulot: ${parsed.productName}`);
+  if (parsed.qty != null)    lines.push(`🔢 Miqdor: ${parsed.qty}`);
+  if (parsed.unitPrice != null) lines.push(`🏷 Narx: ${parsed.unitPrice.toLocaleString()}`);
+  if (parsed.date)           lines.push(`📅 Sana: ${parsed.date}`);
+  lines.push(`📝 Izoh: ${parsed.description}`);
+  if (parsed.unknownFields.length > 0) {
+    lines.push(`⚠️ Aniqlanmadi: ${parsed.unknownFields.join(", ")}`);
+  }
+  lines.push("\n_QORALAMA — tasdiqlash platforma orqali._");
+  return lines.join("\n");
+}
 
 // In-memory guards (MVP; spec mentions settings-backed limits — acceptable here).
 const aiUsage = new Map<string, { day: string; count: number }>();
@@ -69,6 +103,22 @@ function startBot(token: string) {
     await ctx.reply(removed ? "Bog'lam o'chirildi." : "Bu chat ulanmagan edi.");
   });
 
+  bot.command("kirish", async (ctx) => {
+    const chatId = String(ctx.chat.id);
+    const id = await api.getIdentity(chatId);
+    if (!id) return void ctx.reply("Avval /ulash orqali platformaga ulaning.");
+
+    entryFlow.set(chatId, { step: "choosing", clientRequestId: randomUUID() });
+
+    await ctx.reply("Nima kiritsiz?", {
+      reply_markup: new InlineKeyboard()
+        .text("💰 Sotuv",    "entry:sale")    .row()
+        .text("💵 To'lov",   "entry:payment") .row()
+        .text("📋 Xarajat",  "entry:expense") .row()
+        .text("📦 Transfer", "entry:transfer"),
+    });
+  });
+
   bot.command("obuna", async (ctx) => {
     const id = await api.getIdentity(String(ctx.chat.id));
     if (!id) return void ctx.reply("Avval /ulash orqali ulaning.");
@@ -88,12 +138,54 @@ function startBot(token: string) {
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
     await ctx.answerCallbackQuery();
+    const chatId = ctx.chat?.id;
+    if (chatId == null) return;
+
+    // ── Entry type selection ───────────────────────────────────────────────
+    if (data.startsWith("entry:")) {
+      const type = data.slice(6); // "sale" | "payment" | "expense" | "transfer"
+      const state = entryFlow.get(String(chatId));
+      if (!state || state.step !== "choosing") return;
+
+      entryFlow.set(String(chatId), { ...state, step: "entering", type });
+      const typeLabel = ENTRY_TYPE_LABELS[type] ?? type;
+      await ctx.editMessageText(
+        `${typeLabel} uchun tavsif yuboring.\n\nMasalan: _"50 dona Namoz kitob, 1 ta Mobekov, jami 540 000 so'm"_`,
+        { parse_mode: "Markdown" },
+      );
+      return;
+    }
+
+    // ── Confirm entry save ─────────────────────────────────────────────────
+    if (data === "confirm:save") {
+      const state = entryFlow.get(String(chatId));
+      if (!state || state.step !== "confirming" || !state.parsed) return;
+
+      const r = await api.saveEntry(String(chatId), state.parsed.type, state.parsed, state.clientRequestId);
+      entryFlow.delete(String(chatId));
+
+      if (!r.ok) {
+        await ctx.editMessageText(`❌ Saqlab bo'lmadi: ${r.error ?? "noma'lum xato"}`);
+        return;
+      }
+      await ctx.editMessageText(
+        `✅ Qoralama saqlandi (${r.kind ?? ""} #${(r.id ?? "").slice(-6)}).\nTasdiqlash uchun platformaga kiring.`,
+      );
+      return;
+    }
+
+    // ── Cancel entry flow ──────────────────────────────────────────────────
+    if (data === "confirm:cancel") {
+      entryFlow.delete(String(chatId));
+      await ctx.editMessageText("❌ Kiritish bekor qilindi.");
+      return;
+    }
+
+    // ── Report shortcut ────────────────────────────────────────────────────
     if (!data.startsWith("r:")) return;
     const name = data.slice(2);
     if (!isReportName(name)) return;
 
-    const chatId = ctx.chat?.id;
-    if (chatId == null) return;
     const id = await api.getIdentity(String(chatId));
     if (!id) return void ctx.reply("Avval /ulash orqali ulaning.");
 
@@ -106,11 +198,40 @@ function startBot(token: string) {
     const text = ctx.message.text;
     if (text.startsWith("/")) return; // unknown command
     const chatId = ctx.chat.id;
-    const id = await api.getIdentity(String(chatId));
+    const chatIdStr = String(chatId);
+
+    // ── Entry flow: user is describing the entry ──────────────────────────
+    const state = entryFlow.get(chatIdStr);
+    if (state && state.step === "entering" && state.type) {
+      await ctx.replyWithChatAction("typing");
+
+      const result = await api.parseEntry(chatIdStr, state.type, text);
+      if (result.error || !result.data) {
+        await ctx.reply(`❌ Parse xatosi: ${result.error ?? "noma'lum"}. Qayta urinib ko'ring.`);
+        return;
+      }
+
+      const parsed = result.data;
+      entryFlow.set(chatIdStr, { ...state, step: "confirming", parsed });
+
+      await ctx.reply(
+        `Tekshiring:\n\n${formatEntryCard(parsed)}\n\nTo'g'rimi?`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: new InlineKeyboard()
+            .text("✅ Ha, saqlash", "confirm:save")
+            .text("❌ Yo'q, bekor", "confirm:cancel"),
+        },
+      );
+      return;
+    }
+
+    // ── Normal free-question AI path ─────────────────────────────────────
+    const id = await api.getIdentity(chatIdStr);
     if (!id) return void ctx.reply("Avval /ulash orqali ulaning. /start");
 
     if (!aiEnabled()) return void ctx.reply("Erkin savol hozircha o'chirilgan. /menu dan hisobot tanlang.");
-    if (!underDailyLimit(String(chatId))) {
+    if (!underDailyLimit(chatIdStr)) {
       return void ctx.reply("Bugungi AI so'rovlar chegarasi tugadi. Ertaga urinib ko'ring yoki /menu dan foydalaning.");
     }
 
