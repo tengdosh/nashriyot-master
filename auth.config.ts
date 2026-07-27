@@ -7,7 +7,8 @@ import type { NextAuthConfig } from "next-auth";
  * are shared and edge-safe.
  */
 export const authConfig = {
-  pages: { signIn: "/login" },
+  basePath: "/api/auth",
+  pages: { signIn: "/nashriyot-master/login" },
   session: { strategy: "jwt" },
   trustHost: true,
   callbacks: {

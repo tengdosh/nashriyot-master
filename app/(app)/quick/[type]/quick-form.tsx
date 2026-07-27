@@ -61,7 +61,6 @@ const transferSchema = z.object({
 });
 type TransferValues = z.infer<typeof transferSchema>;
 
-type AnyValues = SaleValues | PaymentValues | ExpenseValues | TransferValues;
 
 const EXPENSE_CATEGORIES = [
   { value: "IJARA", label: "Ijara" },
@@ -328,7 +327,7 @@ function PaymentForm({ entities }: Props) {
         {...register("amount", { valueAsNumber: true })}
       />
       <div className="flex flex-col gap-1.5">
-        <Label>Yo'nalish</Label>
+        <Label>Yo&apos;nalish</Label>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
