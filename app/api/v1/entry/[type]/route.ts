@@ -18,22 +18,32 @@ import { confirmSalesOrder, shipSalesOrder } from "@/lib/services/sales-service"
 import { createCostEntry } from "@/lib/services/cost-service";
 import { createTransfer } from "@/lib/services/transfer-service";
 
-// ─── Idempotentlik (15 daqiqa TTL) ───────────────────────────────────────────
-const SEEN = new Map<string, number>();
+// ─── Idempotentlik (15 daqiqa TTL, DB-backed + in-memory cache) ─────────────
+const CACHE = new Map<string, number>();
 const TTL_MS = 15 * 60 * 1000;
 
-function isDuplicate(id: string): boolean {
-  const seen = SEEN.get(id);
-  if (seen && Date.now() - seen < TTL_MS) return true;
-  SEEN.set(id, Date.now());
-  // Eski yozuvlarni tozalash
-  if (SEEN.size > 10_000) {
-    const cutoff = Date.now() - TTL_MS;
-    for (const [k, ts] of SEEN) {
-      if (ts < cutoff) SEEN.delete(k);
+async function isDuplicate(id: string): Promise<boolean> {
+  // 1. Fast path: in-memory cache
+  const cached = CACHE.get(id);
+  if (cached && Date.now() - cached < TTL_MS) return true;
+
+  // 2. DB check (survives server restarts)
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + TTL_MS);
+  try {
+    await prisma.idempotencyKey.create({ data: { key: id, expiresAt } });
+    CACHE.set(id, Date.now());
+
+    // Lazy cleanup of expired DB rows (1/200 calls)
+    if (Math.random() < 0.005) {
+      prisma.idempotencyKey.deleteMany({ where: { expiresAt: { lt: now } } }).catch(() => {});
     }
+    return false;
+  } catch {
+    // Unique constraint violation → duplicate
+    CACHE.set(id, Date.now());
+    return true;
   }
-  return false;
 }
 
 // ─── Zod sxemalari ───────────────────────────────────────────────────────────
@@ -83,7 +93,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ typ
 
     // Idempotentlik tekshiruvi
     const clientRequestId = req.headers.get("x-client-request-id");
-    if (clientRequestId && isDuplicate(clientRequestId)) {
+    if (clientRequestId && (await isDuplicate(clientRequestId))) {
       return fail("DUPLICATE", "Bu so'rov allaqachon yuborilgan (idempotent)", 409);
     }
 

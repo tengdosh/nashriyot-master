@@ -1604,3 +1604,16 @@ model TelegramEntryToken {
   @@index([userId])
   @@index([expiresAt])
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Idempotency (server-restart-safe dedup for entry API)
+// ─────────────────────────────────────────────────────────────────────────────
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

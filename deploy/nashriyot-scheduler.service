@@ -1,0 +1,20 @@
+[Unit]
+Description=Nashriyot-Master Job Scheduler
+After=network.target nashriyot-prod.service
+Requires=nashriyot-prod.service
+
+[Service]
+Type=simple
+User=user
+WorkingDirectory=/home/user/nashriyot-deploy
+ExecStart=/usr/bin/npx tsx scheduler/worker.ts
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+EnvironmentFile=/home/user/nashriyot-deploy/.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nashriyot-scheduler
+
+[Install]
+WantedBy=multi-user.target

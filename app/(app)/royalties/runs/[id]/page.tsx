@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { requirePermission } from "@/lib/rbac";
 import { getRoyaltyRun } from "@/lib/services/royalty-service";
 import { Button } from "@/components/ui/button";
@@ -48,9 +48,14 @@ export default async function RoyaltyRunPage({ params }: { params: Promise<{ id:
             {run.approvedBy && ` · ${run.approvedBy.fullName} tasdiqladi`}
           </p>
         </div>
-        <Button variant="outline" render={<Link href="/royalties/runs" />}>
-          <ArrowLeft className="size-4" /> Hisoblarga
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" render={<Link href={`/royalties/runs/${id}/print`} target="_blank" />}>
+            <Printer className="size-4" /> Chop etish
+          </Button>
+          <Button variant="outline" render={<Link href="/royalties/runs" />}>
+            <ArrowLeft className="size-4" /> Hisoblarga
+          </Button>
+        </div>
       </div>
 
       <RunDetail
