@@ -91,11 +91,11 @@ export default async function RoyaltyPrintPage({ params }: { params: Promise<{ i
             <p className="text-xl font-bold">{fmt(totalEarned)}</p>
           </div>
           <div className="text-center border-x">
-            <p className="text-sm text-gray-500">Zaxira (to'planib)</p>
+            <p className="text-sm text-gray-500">Zaxira (to&apos;planib)</p>
             <p className="text-xl font-bold">{fmt(totalReserve)}</p>
           </div>
           <div className="text-center">
-            <p className="text-sm text-gray-500">To'lanishi lozim</p>
+            <p className="text-sm text-gray-500">To&apos;lanishi lozim</p>
             <p className="text-xl font-bold text-green-700">{fmt(totalPayable)}</p>
           </div>
         </div>
@@ -110,7 +110,7 @@ export default async function RoyaltyPrintPage({ params }: { params: Promise<{ i
               <th className="py-2 text-right font-semibold">Hisoblandi</th>
               <th className="py-2 text-right font-semibold">Avans</th>
               <th className="py-2 text-right font-semibold">Zaxira</th>
-              <th className="py-2 text-right font-semibold">To'lanadi</th>
+              <th className="py-2 text-right font-semibold">To&apos;lanadi</th>
             </tr>
           </thead>
           <tbody>
