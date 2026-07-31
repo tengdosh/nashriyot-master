@@ -181,6 +181,18 @@ export async function receiveTransfer(
     throw new TransferServiceError(`Holat oʻtishi taqiqlangan: ${order.status} → RECEIVED`);
   }
 
+  // T-03: Verify warehouses are owned by the correct entities.
+  const [fromWh, toWh] = await Promise.all([
+    prisma.warehouse.findUniqueOrThrow({ where: { id: warehouses.fromWarehouseId }, select: { entityId: true } }),
+    prisma.warehouse.findUniqueOrThrow({ where: { id: warehouses.toWarehouseId }, select: { entityId: true } }),
+  ]);
+  if (fromWh.entityId !== order.fromEntityId) {
+    throw new TransferServiceError("Manba ombor transfer yuborguvchi sub'ektga tegishli emas");
+  }
+  if (toWh.entityId !== order.toEntityId) {
+    throw new TransferServiceError("Manzil ombor transfer qabul qiluvchi sub'ektga tegishli emas");
+  }
+
   return runWithAudit({ userId }, async () =>
     prisma.$transaction(async (txAny) => {
       const tx = txAny as unknown as Prisma.TransactionClient;
@@ -208,7 +220,7 @@ export async function receiveTransfer(
         where: { id: orderId },
         data: { status: "RECEIVED", receivedDate: new Date() },
       });
-    }),
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
   );
 }
 

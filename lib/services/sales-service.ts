@@ -331,6 +331,7 @@ export async function shipSalesOrder(orderId: string, userId: string) {
 
   return runWithAudit({ userId }, async () => {
     const sealed = await prisma.$transaction(async (txAny) => {
+      // T-20: Serializable prevents concurrent FIFO double-counting.
       const tx = txAny as unknown as Prisma.TransactionClient;
       const rows: { lineId: string; cogsUnit: Prisma.Decimal; cmUnit: Prisma.Decimal }[] = [];
 
@@ -383,7 +384,7 @@ export async function shipSalesOrder(orderId: string, userId: string) {
         data: { status: "SHIPPED", shippedDate: new Date() },
       });
       return rows;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return { orderId, sealed };
   });

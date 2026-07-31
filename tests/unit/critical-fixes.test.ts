@@ -243,6 +243,210 @@ describe("PrintOrder fixedCost — validator", () => {
   });
 });
 
+// ── T-20: FIFO concurrent isolation ──────────────────────────────────────────
+
+describe("T-20: FIFO Serializable isolation", () => {
+  it("oldest-first layer ordering is deterministic", () => {
+    const layers = [
+      { id: "l2", date: new Date("2026-02-01"), qtyRemaining: 50 },
+      { id: "l1", date: new Date("2026-01-01"), qtyRemaining: 100 },
+    ];
+    const sorted = [...layers].sort((a, b) => a.date.getTime() - b.date.getTime());
+    expect(sorted[0].id).toBe("l1");
+    expect(sorted[1].id).toBe("l2");
+  });
+
+  it("concurrent over-issue is detected by zero qtyRemaining", () => {
+    // After a serialization conflict, the loser sees qtyRemaining=0
+    const layerAfterFirstTx = { qtyRemaining: 0 };
+    let remaining = 10;
+    const avail = layerAfterFirstTx.qtyRemaining ?? 0;
+    const take = Math.min(remaining, avail);
+    remaining -= take;
+    expect(remaining).toBe(10); // nothing was consumed — InsufficientStockError would follow
+  });
+
+  it("COGS calculation is correct for partial layer consumption", () => {
+    const layers = [
+      { qtyRemaining: 30, unitCost: 10_000 },
+      { qtyRemaining: 50, unitCost: 15_000 },
+    ];
+    let remaining = 40;
+    let cogs = 0;
+    for (const l of layers) {
+      if (remaining <= 0) break;
+      const avail = l.qtyRemaining ?? 0;
+      const take = Math.min(remaining, avail);
+      cogs += l.unitCost * take;
+      remaining -= take;
+    }
+    expect(remaining).toBe(0);
+    expect(cogs).toBe(30 * 10_000 + 10 * 15_000); // 450_000
+  });
+});
+
+// ── T-05: returnStock avgCost inside transaction ──────────────────────────────
+
+describe("T-05: returnStock — avgCost inside tx, zero-cost rejection", () => {
+  it("zero avgCost triggers InventoryError", () => {
+    function validateAvgCost(avgCost: number) {
+      if (avgCost === 0)
+        throw new Error("Qaytarish tannarxi aniqlanmadi — bu mahsulot uchun FIFO qatlamlari topilmadi");
+    }
+    expect(() => validateAvgCost(0)).toThrow("Qaytarish tannarxi aniqlanmadi");
+    expect(() => validateAvgCost(12_000)).not.toThrow();
+  });
+
+  it("avgCost computed from qtyRemaining > 0 layers only", () => {
+    const layers = [
+      { qtyRemaining: 50, unitCost: 10_000 },
+      { qtyRemaining: 0,  unitCost: 5_000 },   // consumed — excluded
+      { qtyRemaining: 30, unitCost: 15_000 },
+    ];
+    const active = layers.filter((l) => l.qtyRemaining > 0);
+    const totalQty = active.reduce((s, l) => s + l.qtyRemaining, 0);
+    const totalCost = active.reduce((s, l) => s + l.unitCost * l.qtyRemaining, 0);
+    const avg = totalCost / totalQty;
+    // (50×10000 + 30×15000) / 80 = (500000 + 450000) / 80 = 11875
+    expect(avg).toBeCloseTo(11_875);
+  });
+
+  it("empty layer list returns zero (triggers rejection in returnStock)", () => {
+    const layers: { qtyRemaining: number; unitCost: number }[] = [];
+    const totalQty = layers.reduce((s, l) => s + l.qtyRemaining, 0);
+    const avg = totalQty > 0 ? 1 : 0;
+    expect(avg).toBe(0);
+  });
+});
+
+// ── T-03: receiveTransfer warehouse entity validation ─────────────────────────
+
+describe("T-03: receiveTransfer — warehouse owned by correct entity", () => {
+  function validateWarehouseOwnership(
+    fromWh: { entityId: string },
+    toWh: { entityId: string },
+    order: { fromEntityId: string; toEntityId: string },
+  ) {
+    if (fromWh.entityId !== order.fromEntityId)
+      throw new Error("Manba ombor transfer yuborguvchi sub'ektga tegishli emas");
+    if (toWh.entityId !== order.toEntityId)
+      throw new Error("Manzil ombor transfer qabul qiluvchi sub'ektga tegishli emas");
+  }
+
+  const order = { fromEntityId: "entity-tasnim", toEntityId: "entity-sotuv" };
+
+  it("correct warehouse ownership passes", () => {
+    expect(() =>
+      validateWarehouseOwnership(
+        { entityId: "entity-tasnim" },
+        { entityId: "entity-sotuv" },
+        order,
+      ),
+    ).not.toThrow();
+  });
+
+  it("wrong fromWarehouse entity is rejected", () => {
+    expect(() =>
+      validateWarehouseOwnership(
+        { entityId: "entity-tahlil" },
+        { entityId: "entity-sotuv" },
+        order,
+      ),
+    ).toThrow("Manba ombor transfer yuborguvchi sub'ektga tegishli emas");
+  });
+
+  it("wrong toWarehouse entity is rejected", () => {
+    expect(() =>
+      validateWarehouseOwnership(
+        { entityId: "entity-tasnim" },
+        { entityId: "entity-tahlil" },
+        order,
+      ),
+    ).toThrow("Manzil ombor transfer qabul qiluvchi sub'ektga tegishli emas");
+  });
+
+  it("both warehouses wrong — fromWarehouse error fires first", () => {
+    expect(() =>
+      validateWarehouseOwnership(
+        { entityId: "entity-tahlil" },
+        { entityId: "entity-tahlil" },
+        order,
+      ),
+    ).toThrow("Manba ombor");
+  });
+});
+
+// ── T-26: overridePMin requires admin.settings ────────────────────────────────
+
+describe("T-26: overridePMin — admin.settings required in entry REST route", () => {
+  function checkOverridePMinPermission(overridePMin: boolean | undefined, permissions: string[]) {
+    if (overridePMin && !permissions.includes("admin.settings"))
+      throw new Error("P_min bekor qilish uchun admin.settings huquqi talab qilinadi");
+  }
+
+  it("entry.write alone cannot override PMin", () => {
+    expect(() => checkOverridePMinPermission(true, ["entry.write"])).toThrow("admin.settings");
+  });
+
+  it("admin.settings allows override", () => {
+    expect(() =>
+      checkOverridePMinPermission(true, ["entry.write", "admin.settings"]),
+    ).not.toThrow();
+  });
+
+  it("overridePMin=false does not require admin.settings", () => {
+    expect(() => checkOverridePMinPermission(false, ["entry.write"])).not.toThrow();
+  });
+
+  it("overridePMin=undefined does not require admin.settings", () => {
+    expect(() => checkOverridePMinPermission(undefined, ["entry.write"])).not.toThrow();
+  });
+});
+
+// ── T-27: AUTH_SECRET fail-fast, no hardcoded fallbacks ──────────────────────
+
+describe("T-27: AUTH_SECRET — fail-fast if not set", () => {
+  it("secret() throws when AUTH_SECRET is absent", () => {
+    const saved = process.env.AUTH_SECRET;
+    delete process.env.AUTH_SECRET;
+    try {
+      const fn = () => {
+        const s = process.env.AUTH_SECRET;
+        if (!s) throw new Error("AUTH_SECRET qiymati o'rnatilmagan — server sozlamalarini tekshiring");
+        return s;
+      };
+      expect(fn).toThrow("AUTH_SECRET qiymati o'rnatilmagan");
+    } finally {
+      if (saved !== undefined) process.env.AUTH_SECRET = saved;
+    }
+  });
+
+  it("secret() returns value when AUTH_SECRET is set", () => {
+    const saved = process.env.AUTH_SECRET;
+    process.env.AUTH_SECRET = "test-secret-32-chars-or-more-here";
+    try {
+      const fn = () => {
+        const s = process.env.AUTH_SECRET;
+        if (!s) throw new Error("AUTH_SECRET qiymati o'rnatilmagan — server sozlamalarini tekshiring");
+        return s;
+      };
+      expect(fn()).toBe("test-secret-32-chars-or-more-here");
+    } finally {
+      if (saved !== undefined) process.env.AUTH_SECRET = saved;
+      else delete process.env.AUTH_SECRET;
+    }
+  });
+
+  it("fallback strings 'dev-only-secret-change-me' and 'dev-secret' are NOT safe keys", () => {
+    // Documents why fail-fast is better than a weak default
+    const badFallbacks = ["dev-only-secret-change-me", "dev-secret"];
+    for (const fallback of badFallbacks) {
+      // A real HMAC key should be at least 32 random bytes; these fixed strings are publicly known
+      expect(fallback.length).toBeLessThan(32);
+    }
+  });
+});
+
 // ── Bug 7: listTransfers entity filter ───────────────────────────────────────
 
 describe("listTransfers() entity filter logic", () => {

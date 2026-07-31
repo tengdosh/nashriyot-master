@@ -189,7 +189,9 @@ export async function portalStatementForContributor(statementId: string, contrib
 // ── Signed download tokens ────────────────────────────────────────────────────
 
 function secret(): string {
-  return process.env.AUTH_SECRET ?? "dev-only-secret-change-me";
+  const s = process.env.AUTH_SECRET;
+  if (!s) throw new Error("AUTH_SECRET qiymati o'rnatilmagan — server sozlamalarini tekshiring");
+  return s;
 }
 
 /**

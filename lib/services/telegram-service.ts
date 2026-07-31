@@ -15,7 +15,8 @@ const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes (playbook)
 
 /** Deterministic keyed hash so a submitted code is one indexed lookup, not a scan. */
 function hashCode(code: string): string {
-  const key = process.env.AUTH_SECRET ?? "dev-secret";
+  const key = process.env.AUTH_SECRET;
+  if (!key) throw new Error("AUTH_SECRET qiymati o'rnatilmagan — server sozlamalarini tekshiring");
   return createHmac("sha256", key).update(`tg:${code}`).digest("hex");
 }
 

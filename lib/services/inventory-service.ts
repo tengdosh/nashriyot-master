@@ -138,13 +138,39 @@ export async function fifoIssueTx(
   userId: string,
 ) {
   return runWithAudit({ userId }, async () =>
-    prisma.$transaction(async (tx) => fifoIssue(tx as unknown as Prisma.TransactionClient, input)),
+    prisma.$transaction(async (tx) => fifoIssue(tx as unknown as Prisma.TransactionClient, input), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    }),
   );
 }
 
 /** Weighted-average unit cost of the remaining FIFO layers. */
 export async function fifoAvgUnitCost(productId: string, warehouseId?: string): Promise<Prisma.Decimal> {
   const layers = await prisma.stockMovement.findMany({
+    where: {
+      productId,
+      type: { in: LAYER_TYPES },
+      qtyRemaining: { gt: 0 },
+      ...(warehouseId ? { warehouseId } : {}),
+    },
+  });
+  let qty = 0;
+  let cost = new Prisma.Decimal(0);
+  for (const l of layers) {
+    const q = l.qtyRemaining ?? 0;
+    qty += q;
+    cost = cost.plus(new Prisma.Decimal(l.unitCost ?? 0).times(q));
+  }
+  return qty > 0 ? cost.div(qty) : new Prisma.Decimal(0);
+}
+
+/** Transaction-scoped avg cost — snapshot-consistent; call inside a $transaction. */
+async function fifoAvgUnitCostTx(
+  tx: Prisma.TransactionClient,
+  productId: string,
+  warehouseId?: string,
+): Promise<Prisma.Decimal> {
+  const layers = await tx.stockMovement.findMany({
     where: {
       productId,
       type: { in: LAYER_TYPES },
@@ -232,7 +258,7 @@ export async function transferStock(
         update: { qtyOnHand: { increment: input.qty } },
       });
       return { qty: input.qty };
-    }),
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
   );
 }
 
@@ -310,7 +336,7 @@ export async function adjustStock(
         refType: "Adjust",
         reason: input.reason,
       });
-    }),
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
   );
 }
 
@@ -332,12 +358,16 @@ export async function returnStock(
   userId: string,
 ) {
   if (input.qty <= 0) throw new InventoryError("Qaytarish miqdori 0 dan katta boʻlishi kerak");
-  const avgCost = await fifoAvgUnitCost(input.productId, input.warehouseId);
   const sellable = input.condition === "SELLABLE";
 
   return runWithAudit({ userId }, async () =>
     prisma.$transaction(async (txAny) => {
       const tx = txAny as unknown as Prisma.TransactionClient;
+      // T-05: compute inside tx for snapshot-consistency; reject zero-cost returns.
+      const avgCost = await fifoAvgUnitCostTx(tx, input.productId, input.warehouseId);
+      if (avgCost.isZero()) {
+        throw new InventoryError("Qaytarish tannarxi aniqlanmadi — bu mahsulot uchun FIFO qatlamlari topilmadi");
+      }
       const movement = await tx.stockMovement.create({
         data: {
           productId: input.productId,
@@ -361,7 +391,7 @@ export async function returnStock(
         });
       }
       return movement;
-    }),
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
   );
 }
 

@@ -103,6 +103,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ typ
       case "sale": {
         const input = saleSchema.parse(body);
         assertRowAccess(user, { entityId: input.entityId });
+        // T-26: overridePMin requires admin.settings (mirrors the Server Action guard).
+        if (input.overridePMin && !user.permissions.includes("admin.settings")) {
+          return fail("FORBIDDEN", "P_min bekor qilish uchun admin.settings huquqi talab qilinadi", 403);
+        }
         // SalesOrder DRAFT yaratish → CONFIRMED → SHIPPED zanjiri
         const { order } = await createSalesOrder(
           {
