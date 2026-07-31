@@ -566,7 +566,8 @@ function OnixPanel({ titleId }: { titleId: string }) {
   async function preview() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/titles/${titleId}/onix`);
+      const bp = process.env.NEXT_PUBLIC_BASEPATH ?? "";
+      const res = await fetch(`${bp}/api/v1/titles/${titleId}/onix`);
       setXml(await res.text());
     } catch {
       toast.error("ONIX yuklab boʻlmadi");
@@ -584,7 +585,7 @@ function OnixPanel({ titleId }: { titleId: string }) {
         <Button
           size="sm"
           variant="outline"
-          render={<a href={`/api/v1/titles/${titleId}/onix`} download={`onix-${titleId}.xml`} />}
+          render={<a href={`${process.env.NEXT_PUBLIC_BASEPATH ?? ""}/api/v1/titles/${titleId}/onix`} download={`onix-${titleId}.xml`} />}
         >
           <Download className="size-4" /> Yuklab olish (ONIX 3.0)
         </Button>

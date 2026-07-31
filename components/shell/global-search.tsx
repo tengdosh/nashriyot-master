@@ -36,7 +36,8 @@ export function GlobalSearch() {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/v1/search?q=${encodeURIComponent(q)}`);
+        const bp = process.env.NEXT_PUBLIC_BASEPATH ?? "";
+        const res = await fetch(`${bp}/api/v1/search?q=${encodeURIComponent(q)}`);
         const json = await res.json();
         setResults(json.data ?? []);
       } catch {

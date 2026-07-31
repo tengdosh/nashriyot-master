@@ -40,7 +40,7 @@ export function PortalNav({ name }: { name: string }) {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => signOut({ callbackUrl: "/login" })}
+        onClick={() => signOut({ callbackUrl: "/nashriyot-master/login" })}
         aria-label="Chiqish"
       >
         <LogOut className="size-4" />

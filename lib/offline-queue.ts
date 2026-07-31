@@ -72,7 +72,8 @@ export async function flush(): Promise<void> {
 
   for (const item of items) {
     try {
-      const res = await fetch(`/api/v1/entry/${item.type}`, {
+      const bp = process.env.NEXT_PUBLIC_BASEPATH ?? "";
+      const res = await fetch(`${bp}/api/v1/entry/${item.type}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

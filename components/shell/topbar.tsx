@@ -96,7 +96,7 @@ export function Topbar({
             <DropdownMenuItem render={<Link href="/profile" />}>
               <User className="size-4" /> Profil va Telegram
             </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
+            <DropdownMenuItem variant="destructive" onClick={() => signOut({ callbackUrl: "/nashriyot-master/login" })}>
               <LogOut className="size-4" /> Chiqish
             </DropdownMenuItem>
           </DropdownMenuContent>
