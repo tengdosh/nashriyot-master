@@ -1,3 +1,4 @@
+// check:entity-ok: entityId is used only as a read-path filter (GET where clause), not in writes
 import type { NextRequest } from "next/server";
 import { requirePermission } from "@/lib/rbac";
 import { costEntrySchema } from "@/lib/validators/acquisition";

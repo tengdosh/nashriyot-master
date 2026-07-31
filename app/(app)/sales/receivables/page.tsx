@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { agingReport } from "@/lib/services/receivables-service";
 import { AGING_BUCKETS, AGING_LABELS } from "@/lib/sales";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ export const metadata = { title: "Qarzlar (AR)" };
 
 export default async function ReceivablesPage() {
   const user = await requirePermission("sales.read");
-  const { rows, summary } = await agingReport();
+  const eIds = entityFilter(user);
+  const { rows, summary } = await agingReport(new Date(), eIds);
 
   const view: ReceivableView[] = rows.map((r) => ({
     id: r.id,

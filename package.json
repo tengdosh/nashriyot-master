@@ -22,7 +22,8 @@
     "seed:demo": "tsx prisma/seed-demo.ts",
     "seed:real": "tsx prisma/seed-real.ts",
     "scheduler": "tsx scheduler/worker.ts",
-    "scheduler:once": "tsx -e \"import('./scheduler/worker.ts')\""
+    "scheduler:once": "tsx -e \"import('./scheduler/worker.ts')\"",
+    "check:entity": "node scripts/check-entity-isolation.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

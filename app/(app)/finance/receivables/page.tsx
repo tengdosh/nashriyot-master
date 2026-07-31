@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { agingReport } from "@/lib/services/receivables-service";
 import { creditPanel } from "@/lib/services/finance-service";
 import { AGING_BUCKETS, AGING_LABELS } from "@/lib/sales";
@@ -24,7 +24,8 @@ export const metadata = { title: "Qarzlar (AR)" };
 
 export default async function FinanceReceivablesPage() {
   const user = await requirePermission("finance.read");
-  const [{ rows, summary }, credit] = await Promise.all([agingReport(), creditPanel()]);
+  const eIds = entityFilter(user);
+  const [{ rows, summary }, credit] = await Promise.all([agingReport(new Date(), eIds), creditPanel()]);
 
   const view: ReceivableView[] = rows.map((r) => ({
     id: r.id,

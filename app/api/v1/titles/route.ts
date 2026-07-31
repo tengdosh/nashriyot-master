@@ -1,3 +1,4 @@
+// check:entity-ok: entityId used only as GET entity-access filter; title creation is acquisitions-admin act
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";

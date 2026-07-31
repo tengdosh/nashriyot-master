@@ -28,9 +28,14 @@ export type ReceivableRow = {
 };
 
 /** AR aging report (spec v1 §5.5): 0–30 / 31–60 / 61–90 / 90+. */
-export async function agingReport(now: Date = new Date()) {
+export async function agingReport(now: Date = new Date(), entityIds?: string[] | null) {
   const rows = await prisma.receivable.findMany({
-    where: { status: { in: ["OPEN", "PARTIAL"] } },
+    where: {
+      status: { in: ["OPEN", "PARTIAL"] },
+      ...(entityIds !== null && entityIds !== undefined
+        ? { entityId: { in: entityIds } }
+        : {}),
+    },
     include: {
       partner: { select: { name: true } },
       entity: { select: { name: true } },

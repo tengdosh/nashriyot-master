@@ -36,6 +36,24 @@ export function accessibleEntityIds(user: RbacUser | null | undefined): string[]
   return user?.entityAccess ?? [];
 }
 
+/**
+ * Returns entity IDs to use as a Prisma `where: { entityId: { in: ... } }` filter.
+ *
+ * - `null`  → unrestricted (admin/director — no WHERE clause)
+ * - `[]`    → fail-closed (entity-bound user with no assigned entities — returns nothing)
+ * - `[...]` → filter to exactly these entity IDs
+ *
+ * Use with: `eIds === null ? {} : { entityId: { in: eIds } }`
+ */
+export function entityFilter(user: RbacUser | null | undefined): string[] | null {
+  if (!user) return [];
+  if (user.entityAccess && user.entityAccess.length > 0) return [...user.entityAccess];
+  const isAdmin =
+    user.permissions?.some((p) => p.startsWith("admin.")) ||
+    user.roles?.some((r) => r === "DIRECTOR" || r === "ADMIN");
+  return isAdmin ? null : [];
+}
+
 // ── Pure assertions (throw AuthzError) ────────────────────────────────────────
 export function assertPermission(user: RbacUser | null | undefined, code: string): void {
   if (!user) throw new AuthzError(401, "Avtorizatsiya talab qilinadi");

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Radio, Undo2, Wallet } from "lucide-react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { orderTotals } from "@/lib/sales";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -13,9 +13,11 @@ export const metadata = { title: "Sotuv buyurtmalari" };
 
 export default async function SalesOrdersPage() {
   const user = await requirePermission("sales.read");
+  const eIds = entityFilter(user);
 
   const [orders, channels, entities, warehouses, partners, products] = await Promise.all([
     prisma.salesOrder.findMany({
+      where: eIds === null ? {} : { entityId: { in: eIds } },
       include: {
         channel: { select: { name: true, type: true, feeRate: true } },
         entity: { select: { name: true } },
