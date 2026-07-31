@@ -3,34 +3,46 @@
 import { AuthError } from "next-auth";
 import { headers } from "next/headers";
 import { signIn } from "@/auth";
+import { prisma } from "@/lib/db";
 
 export type LoginState = { error?: string };
 
-// ─── Rate limiter: 5 attempts per 15 min per IP+email ────────────────────────
-const ATTEMPTS = new Map<string, { count: number; firstAt: number }>();
-const MAX = 5;
+// ─── Rate limiter: 5 attempts per 15 min per IP+email (DB-backed, restart-safe) ──
+const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
 
-function checkRateLimit(ip: string, email: string): boolean {
+async function isRateLimited(ip: string, email: string): Promise<boolean> {
   const key = `${ip}:${email.toLowerCase()}`;
-  const now = Date.now();
-  const rec = ATTEMPTS.get(key);
-  if (!rec || now - rec.firstAt > WINDOW_MS) {
-    ATTEMPTS.set(key, { count: 1, firstAt: now });
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + WINDOW_MS);
+
+  const existing = await prisma.loginAttempt.findUnique({ where: { key } });
+
+  if (!existing || existing.expiresAt < now) {
+    // First attempt or window expired — create/reset
+    await prisma.loginAttempt.upsert({
+      where: { key },
+      update: { count: 1, firstAt: now, expiresAt },
+      create: { key, count: 1, firstAt: now, expiresAt },
+    });
     return false;
   }
-  rec.count += 1;
-  if (rec.count > MAX) return true;
+
+  if (existing.count >= MAX_ATTEMPTS) return true;
+
+  await prisma.loginAttempt.update({
+    where: { key },
+    data: { count: { increment: 1 } },
+  });
   return false;
 }
 
-// Stale entry cleanup (lazy, triggered 1/100 calls)
-function maybeCleanup() {
+// Lazy cleanup of expired rows (runs ~1% of the time, async, non-blocking)
+function maybeCleanExpired() {
   if (Math.random() > 0.01) return;
-  const cutoff = Date.now() - WINDOW_MS;
-  for (const [k, v] of ATTEMPTS) {
-    if (v.firstAt < cutoff) ATTEMPTS.delete(k);
-  }
+  prisma.loginAttempt
+    .deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    .catch(() => {});
 }
 
 export async function authenticate(
@@ -44,8 +56,9 @@ export async function authenticate(
     "unknown";
   const email = String(formData.get("email") ?? "");
 
-  maybeCleanup();
-  if (checkRateLimit(ip, email)) {
+  maybeCleanExpired();
+
+  if (await isRateLimited(ip, email)) {
     return { error: "Juda ko'p urinish. 15 daqiqadan so'ng qayta urinib ko'ring." };
   }
 

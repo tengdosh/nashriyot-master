@@ -1617,3 +1617,16 @@ model IdempotencyKey {
 
   @@index([expiresAt])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Rate limiting (login attempts — server-restart-safe)
+// ─────────────────────────────────────────────────────────────────────────────
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  key       String   @unique // "ip:email" (lowercased)
+  count     Int      @default(1)
+  firstAt   DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

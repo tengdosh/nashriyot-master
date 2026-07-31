@@ -276,3 +276,62 @@ npm run dev
 
 # Login: director@tasnim.uz / Parol123!
 ```
+
+---
+
+## Zaxira va tiklash
+
+### Cron o'rnatish (prod server)
+
+```bash
+# Har kecha 02:00 da backup (30 kun saqlash)
+crontab -e
+# Qo'shing:
+0 2 * * * DATABASE_URL="postgresql://nashriyot:PAROL@localhost:5533/nashriyot?schema=public" \
+  BACKUP_DIR=/home/user/nashriyot-backups \
+  bash /home/user/nashriyot-deploy/deploy/backup.sh 30 >> /var/log/nashriyot-backup.log 2>&1
+```
+
+### Sinov (har doim ishga tushiring!)
+
+```bash
+# Backup → tiklash → yozuv taqqoslash
+DATABASE_URL="postgresql://..." bash deploy/test-backup-restore.sh
+```
+
+### Tiklash qadamlari
+
+1. Servisni to'xtatish: `sudo systemctl stop nashriyot-prod`
+2. Restore skriptini ishga tushiring:
+   ```bash
+   bash deploy/restore.sh /home/user/nashriyot-backups/nashriyot_20260730_020000.sql.gz
+   ```
+3. Migratsiaylarni tekshiring: `npx prisma migrate deploy`
+4. Servisni qayta ishga tushiring: `sudo systemctl start nashriyot-prod`
+
+> **Eslatma:** Offsite nusxa (Google Drive) hali yo'q — keyinroq qo'shiladi.
+> Hozircha backuplar `/home/user/nashriyot-backups/` da mahalliy saqlanadi.
+> Muhim ma'lumotlar uchun qo'lda tashqi diskka nusxa oling.
+
+---
+
+## Ma'lum zaifliklar
+
+`npm audit` 3 ta **high** darajadagi CVE topdi (2026-07-31 holati):
+
+| Paket | CVE | Tavsif | Nima uchun tuzatilmagan |
+|-------|-----|--------|------------------------|
+| `sharp` (Next.js ichida) | CVE-2026-33327, -33328, -35590, -35591 | libvips zaifliklar | Fix Next.js ni 9.x ga tushirishni talab qiladi (breaking) |
+| `postcss` (Next.js ichida) | GHSA-xxx | XSS via `</style>` va sourceMappingURL | Yuqoridagi bilan bir xil sabab |
+| `next` (bevosita) | next@15 zaruriy | sharp/postcss orqali meros | Next 15→9 o'tish mumkin emas |
+
+**Qachon qayta ko'riladi:** Next.js keyingi minor relizida (15.x) ushbu CVElar patch
+qilinishi kutilmoqda. `npm audit` da "fix available via `npm audit fix --force`" deb
+ko'rsatilsa ham, `--force` Next.js 9 ga downgrade qiladi — bu butun loyihani buzadi.
+
+**Vaqtinchalik choralar:**
+- Bu zaifliklar faqat Next.js build/image processing bosqichida mavjud
+- Server-side rendering yo'li orqali ekspluatatsiya qilinishi qiyin
+- `sharp` faqat rasmlarni optimallashtirish uchun ishlatiladi (ONIX/fayl yuklash)
+
+**Kuzatish:** Har oyda `npm audit` ishga tushiring va Next.js patch'larini kuzating.
