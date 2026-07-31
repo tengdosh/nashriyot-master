@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, assertRowAccess } from "@/lib/rbac";
 import {
   salesOrderCreateSchema,
   returnCreateSchema,
@@ -34,6 +34,7 @@ export async function createSalesOrderAction(input: unknown) {
   const user = parsed.overridePMin
     ? await requirePermission("admin.settings")
     : await requirePermission("sales.write");
+  assertRowAccess(user, { entityId: parsed.entityId });
   const { order } = await createSalesOrder(parsed, user.id);
   revalidateSales(order.id);
   return order.id;
@@ -41,6 +42,8 @@ export async function createSalesOrderAction(input: unknown) {
 
 export async function confirmOrderAction(id: string) {
   const user = await requirePermission("sales.write");
+  const row = await prisma.salesOrder.findUniqueOrThrow({ where: { id }, select: { entityId: true } });
+  assertRowAccess(user, { entityId: row.entityId });
   await confirmSalesOrder(id, user.id);
   revalidateSales(id);
   revalidatePath("/inventory");
@@ -48,6 +51,8 @@ export async function confirmOrderAction(id: string) {
 
 export async function shipOrderAction(id: string) {
   const user = await requirePermission("sales.write");
+  const row = await prisma.salesOrder.findUniqueOrThrow({ where: { id }, select: { entityId: true } });
+  assertRowAccess(user, { entityId: row.entityId });
   await shipSalesOrder(id, user.id);
   revalidateSales(id);
   revalidatePath("/inventory");
@@ -55,12 +60,16 @@ export async function shipOrderAction(id: string) {
 
 export async function invoiceOrderAction(id: string) {
   const user = await requirePermission("sales.write");
+  const row = await prisma.salesOrder.findUniqueOrThrow({ where: { id }, select: { entityId: true } });
+  assertRowAccess(user, { entityId: row.entityId });
   await invoiceSalesOrder(id, user.id);
   revalidateSales(id);
 }
 
 export async function cancelOrderAction(id: string) {
   const user = await requirePermission("sales.write");
+  const row = await prisma.salesOrder.findUniqueOrThrow({ where: { id }, select: { entityId: true } });
+  assertRowAccess(user, { entityId: row.entityId });
   await cancelSalesOrder(id, user.id);
   revalidateSales(id);
   revalidatePath("/inventory");

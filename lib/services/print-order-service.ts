@@ -2,6 +2,7 @@ import { Prisma, type PrintOrderStatus } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { runWithAudit } from "@/lib/audit-context";
 import { stockIn } from "./inventory-service";
+import { createCostEntry } from "./cost-service";
 import type { PrintOrderCreateInput } from "@/lib/validators/production";
 
 // Status machine (spec §5.3): REQUESTED→APPROVED→PRINTING→RECEIVED.
@@ -87,6 +88,23 @@ export async function receivePrintOrder(
         data: { status: "RECEIVED", receivedQty: actualQty, receivedDate: new Date() },
       });
     });
+
+    // Fixed cost entry (pre-press, setup fees) — separate from FIFO unitCost to avoid double-counting.
+    const fixedDec = new Prisma.Decimal(order.fixedCost ?? 0);
+    if (order.editionId && fixedDec.gt(0)) {
+      await createCostEntry(
+        {
+          scope: "EDITION",
+          category: "BOSMA",
+          editionId: order.editionId,
+          amount: fixedDec.toNumber(),
+          currency: order.currency,
+          rate: Number(order.rate),
+          date: new Date().toISOString().split("T")[0],
+        },
+        userId,
+      );
+    }
 
     await checkVariance(order.editionId, order.id, unitCostUZS.toNumber());
     return { order: updated, unitCostUZS };

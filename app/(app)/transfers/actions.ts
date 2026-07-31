@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, assertRowAccess } from "@/lib/rbac";
+import { prisma } from "@/lib/db";
 import { transferCreateSchema, settlementSchema } from "@/lib/validators/transfer";
 import {
   createTransfer,
@@ -17,6 +18,7 @@ export async function createTransferAction(input: unknown) {
   const user = parsed.overridePMin
     ? await requirePermission("transfers.override")
     : await requirePermission("transfers.write");
+  assertRowAccess(user, { entityId: parsed.fromEntityId });
   const { order } = await createTransfer(parsed, user.id);
   revalidatePath("/transfers");
   return order.id;
@@ -24,12 +26,16 @@ export async function createTransferAction(input: unknown) {
 
 export async function shipTransferAction(id: string) {
   const user = await requirePermission("transfers.write");
+  const row = await prisma.transferOrder.findUniqueOrThrow({ where: { id }, select: { fromEntityId: true } });
+  assertRowAccess(user, { entityId: row.fromEntityId });
   await shipTransfer(id, user.id);
   revalidatePath("/transfers");
 }
 
 export async function receiveTransferAction(id: string, fromWarehouseId: string, toWarehouseId: string) {
   const user = await requirePermission("transfers.write");
+  const row = await prisma.transferOrder.findUniqueOrThrow({ where: { id }, select: { fromEntityId: true } });
+  assertRowAccess(user, { entityId: row.fromEntityId });
   await receiveTransfer(id, { fromWarehouseId, toWarehouseId }, user.id);
   revalidatePath("/transfers");
   revalidatePath("/entities/ledger");
@@ -38,7 +44,9 @@ export async function receiveTransferAction(id: string, fromWarehouseId: string,
 
 export async function recordSettlementAction(input: unknown) {
   const user = await requirePermission("finance.write");
-  await recordSettlement(settlementSchema.parse(input), user.id);
+  const parsed = settlementSchema.parse(input);
+  assertRowAccess(user, { entityId: parsed.fromEntityId });
+  await recordSettlement(parsed, user.id);
   revalidatePath("/entities/ledger");
 }
 

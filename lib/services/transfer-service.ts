@@ -185,12 +185,12 @@ export async function receiveTransfer(
     prisma.$transaction(async (txAny) => {
       const tx = txAny as unknown as Prisma.TransactionClient;
       for (const l of order.lines) {
-        // Sender: consume FIFO OUT (its own cost basis leaves the books).
+        // Sender: FIFO TRANSFER (cost basis leaves; type=TRANSFER keeps it out of salesSeries/Sotilgan).
         await fifoIssue(tx, {
           productId: l.productId,
           warehouseId: warehouses.fromWarehouseId,
           qty: l.qty,
-          type: "OUT",
+          type: "TRANSFER",
           refType: "TransferOrder",
           refId: order.id,
         });
@@ -260,8 +260,12 @@ export async function recordSettlement(input: SettlementInput, userId: string) {
   );
 }
 
-export async function listTransfers(take = 200) {
+export async function listTransfers(take = 200, entityIds?: string[]) {
   return prisma.transferOrder.findMany({
+    where:
+      entityIds && entityIds.length > 0
+        ? { OR: [{ fromEntityId: { in: entityIds } }, { toEntityId: { in: entityIds } }] }
+        : undefined,
     include: {
       fromEntity: { select: { name: true } },
       toEntity: { select: { name: true } },

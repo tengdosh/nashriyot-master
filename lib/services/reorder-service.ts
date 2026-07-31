@@ -163,7 +163,7 @@ export async function annualRevenue(now: Date) {
     where: {
       type: "OUT",
       date: { gte: from },
-      OR: [{ refType: null }, { refType: { not: "SalesOrder" } }],
+      OR: [{ refType: null }, { refType: { notIn: ["SalesOrder", "TransferOrder"] } }],
     },
     _sum: { qty: true },
   });

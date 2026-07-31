@@ -9,7 +9,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, assertRowAccess } from "@/lib/rbac";
 import { ok, fail, handleError } from "@/lib/api-response";
 import { prisma } from "@/lib/db";
 import { runWithAudit } from "@/lib/audit-context";
@@ -102,6 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ typ
     switch (type) {
       case "sale": {
         const input = saleSchema.parse(body);
+        assertRowAccess(user, { entityId: input.entityId });
         // SalesOrder DRAFT yaratish → CONFIRMED → SHIPPED zanjiri
         const { order } = await createSalesOrder(
           {
@@ -121,6 +122,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ typ
 
       case "payment": {
         const input = paymentSchema.parse(body);
+        assertRowAccess(user, { entityId: input.entityId });
         const payment = await runWithAudit({ userId: user.id }, async () => {
           return await prisma.payment.create({
             data: {
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ typ
 
       case "transfer": {
         const input = transferSchema.parse(body);
+        assertRowAccess(user, { entityId: input.fromEntityId });
         // TransferOrder DRAFT yaratish
         const { order: transferOrder } = await createTransfer(
           {

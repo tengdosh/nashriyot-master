@@ -1,13 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, assertRowAccess } from "@/lib/rbac";
 import { payableCreateSchema, payablePaySchema, reconMatchSchema } from "@/lib/validators/finance";
 import { createPayable, payPayable, applyMatch, reconciliation } from "@/lib/services/finance-service";
 
 export async function createPayableAction(input: unknown) {
   const user = await requirePermission("finance.write");
-  const p = await createPayable(payableCreateSchema.parse(input), user.id);
+  const parsed = payableCreateSchema.parse(input);
+  if ("entityId" in parsed && typeof parsed.entityId === "string") {
+    assertRowAccess(user, { entityId: parsed.entityId });
+  }
+  const p = await createPayable(parsed, user.id);
   revalidatePath("/finance/payables");
   revalidatePath("/finance");
   return p.id;

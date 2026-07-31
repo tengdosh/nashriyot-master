@@ -73,6 +73,7 @@ export function PrintOrdersClient({
   const [printerId, setPrinterId] = React.useState(printers[0]?.id ?? "");
   const [qty, setQty] = React.useState(3000);
   const [unitPPB, setUnitPPB] = React.useState(39480);
+  const [fixedCost, setFixedCost] = React.useState(0);
   const [currency, setCurrency] = React.useState(printers[0]?.currency ?? "UZS");
   const [rate, setRate] = React.useState(1);
 
@@ -95,7 +96,7 @@ export function PrintOrdersClient({
           printerId,
           quantity: qty,
           unitPPB,
-          fixedCost: 0,
+          fixedCost,
           currency,
           rate,
         });
@@ -191,6 +192,9 @@ export function PrintOrdersClient({
             </Field>
             <Field label="Birlik narxi (valyutada)">
               <Input type="number" value={unitPPB} onChange={(e) => setUnitPPB(Number(e.target.value))} />
+            </Field>
+            <Field label="Qo'zg'atuvchi xarajat (valyutada)">
+              <Input type="number" value={fixedCost} onChange={(e) => setFixedCost(Number(e.target.value))} min={0} />
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field label="Valyuta">

@@ -12,7 +12,7 @@ export default async function TransfersPage() {
   const user = await requirePermission("transfers.read");
 
   const [transfers, entities, warehouses, products] = await Promise.all([
-    listTransfers(),
+    listTransfers(200, user.entityAccess ?? []),
     prisma.entity.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { code: "asc" } }),
     prisma.warehouse.findMany({ where: { archivedAt: null, type: { not: "AGENT" } }, select: { id: true, name: true, entityId: true }, orderBy: { name: "asc" } }),
     prisma.product.findMany({
