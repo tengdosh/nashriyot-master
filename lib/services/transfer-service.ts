@@ -227,7 +227,7 @@ export async function receiveTransfer(
 // ── Inter-entity ledger ────────────────────────────────────────────────────────
 
 /** Net balances per entity pair: received transfers − settlements. */
-export async function entityLedger() {
+export async function entityLedger(entityIds?: string[] | null) {
   const [orders, settlements, entities] = await Promise.all([
     prisma.transferOrder.findMany({
       where: { status: "RECEIVED" },
@@ -250,13 +250,17 @@ export async function entityLedger() {
     settlements.map((s) => ({ fromEntityId: s.fromEntityId, toEntityId: s.toEntityId, amount: new Prisma.Decimal(s.amountUZS).toString() })),
   );
 
-  return balances.map((b) => ({
+  const view = balances.map((b) => ({
     creditorId: b.creditorId,
     creditorName: nameById.get(b.creditorId) ?? b.creditorId,
     debtorId: b.debtorId,
     debtorName: nameById.get(b.debtorId) ?? b.debtorId,
     amount: b.amount,
   }));
+
+  if (entityIds === undefined || entityIds === null) return view;
+  const entitySet = new Set(entityIds);
+  return view.filter((b) => entitySet.has(b.creditorId) || entitySet.has(b.debtorId));
 }
 
 export async function recordSettlement(input: SettlementInput, userId: string) {
@@ -272,10 +276,10 @@ export async function recordSettlement(input: SettlementInput, userId: string) {
   );
 }
 
-export async function listTransfers(take = 200, entityIds?: string[]) {
+export async function listTransfers(take = 200, entityIds?: string[] | null) {
   return prisma.transferOrder.findMany({
     where:
-      entityIds && entityIds.length > 0
+      entityIds !== undefined && entityIds !== null
         ? { OR: [{ fromEntityId: { in: entityIds } }, { toEntityId: { in: entityIds } }] }
         : undefined,
     include: {

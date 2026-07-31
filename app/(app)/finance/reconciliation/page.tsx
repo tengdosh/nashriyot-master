@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { reconciliation } from "@/lib/services/finance-service";
 import { Button } from "@/components/ui/button";
 import { ReconciliationClient, type PendingView, type PartnerOption } from "./reconciliation-client";
@@ -10,8 +10,9 @@ export const metadata = { title: "Bank solishtiruvi" };
 
 export default async function ReconciliationPage() {
   const user = await requirePermission("finance.read");
+  const eIds = entityFilter(user);
   const [{ pending }, partners] = await Promise.all([
-    reconciliation(),
+    reconciliation([], {}, eIds),
     prisma.partner.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 

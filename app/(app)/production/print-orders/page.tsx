@@ -1,3 +1,4 @@
+// check:entity-ok: primary model has no entityId — this module is company-wide
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/rbac";
 import { PrintOrdersClient, type OrderRow, type EditionOpt } from "./print-orders-client";

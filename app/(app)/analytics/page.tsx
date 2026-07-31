@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import {
   pnlByEntity,
   channelProfitability,
@@ -28,10 +28,11 @@ function yearWindow() {
 
 export default async function AnalyticsPage() {
   const user = await requirePermission("analytics.read");
+  const eIds = entityFilter(user);
   const { from, to } = yearWindow();
 
   const [pnl, channels, top, slowest, dead, saved, importRows, adminSettings] = await Promise.all([
-    pnlByEntity(from, to),
+    pnlByEntity(from, to, eIds),
     channelProfitability(),
     topTitles(10),
     slowestTitles(10),

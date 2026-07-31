@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Receipt, CreditCard, GitCompareArrows, Users, ArrowRightLeft } from "lucide-react";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { financeOverview } from "@/lib/services/finance-service";
 import { KpiCard } from "@/components/shared/kpi-card";
 import { InfoHint } from "@/components/shared/info-hint";
@@ -18,8 +18,9 @@ const SUBPAGES = [
 ];
 
 export default async function FinancePage() {
-  await requirePermission("finance.read");
-  const o = await financeOverview();
+  const user = await requirePermission("finance.read");
+  const eIds = entityFilter(user);
+  const o = await financeOverview(new Date(), eIds);
 
   const maxFlow = Math.max(
     1,

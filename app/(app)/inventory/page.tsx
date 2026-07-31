@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowLeftRight, Skull, BarChart3 } from "lucide-react";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { prisma } from "@/lib/db";
 import { inventoryOverview } from "@/lib/services/reorder-service";
 import { fourState } from "@/lib/services/inventory-service";
@@ -13,9 +13,10 @@ export const metadata = { title: "Ombor" };
 
 export default async function InventoryPage() {
   const user = await requirePermission("inventory.read");
+  const eIds = entityFilter(user);
 
   const [overview, warehouses] = await Promise.all([
-    inventoryOverview(),
+    inventoryOverview(new Date(), eIds),
     prisma.warehouse.findMany({
       where: { archivedAt: null },
       select: { id: true, name: true, type: true },

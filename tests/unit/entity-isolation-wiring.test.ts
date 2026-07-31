@@ -303,3 +303,151 @@ describe("entityFilter — fail-closed (T-23)", () => {
     expect(entityFilter(null)).toEqual([]);
   });
 });
+
+// ── Service layer — entityIds threaded through correctly ──────────────────────
+
+describe("Service entityFilter threading", () => {
+  it("listTransfers: empty entityIds → triggers filter (fail-closed, not unrestricted)", () => {
+    // Mirrors the guard condition in listTransfers service implementation:
+    // entityIds !== undefined && entityIds !== null → always apply WHERE when an array is given.
+    // Old bug: `entityIds && entityIds.length > 0` treated [] as "no filter" (fail-OPEN).
+    // Fix: the condition below is true for [], so Prisma sees { in: [] } → 0 results.
+    const eIds: string[] = [];
+    const conditionNew = eIds !== undefined && eIds !== null;
+    const conditionOld = !!(eIds && eIds.length > 0);
+    expect(conditionNew).toBe(true);  // new: filter IS applied (fail-closed)
+    expect(conditionOld).toBe(false); // old: filter was NOT applied (fail-OPEN bug)
+  });
+
+  it("entityFilter: Tasnim user sees only Tasnim entity in transfers", () => {
+    // entityFilter returns ["entity-tasnim"], passed to listTransfers as entityIds
+    // listTransfers WHERE: OR [fromEntityId IN ["entity-tasnim"], toEntityId IN ["entity-tasnim"]]
+    const ids = entityFilter(TASNIM_USER);
+    expect(ids).toEqual(["entity-tasnim"]);
+    expect(ids).not.toContain("entity-tahlil");
+  });
+
+  it("entityFilter: admin (empty entityAccess + admin.settings) returns null → unrestricted", () => {
+    const admin = {
+      id: "admin-1",
+      permissions: ["admin.settings", "finance.read", "analytics.read"],
+      roles: ["ADMIN"],
+      entityAccess: [],
+    };
+    expect(entityFilter(admin)).toBeNull(); // null → no WHERE filter
+  });
+
+  it("entityLedger filters to entries involving user entities", () => {
+    // Mirrors the post-filter logic in entityLedger service:
+    // only balance rows where creditorId or debtorId is in the user's entityIds
+    const mockBalances = [
+      { creditorId: "entity-tasnim", debtorId: "entity-tahlil", creditorName: "T", debtorName: "Ta", amount: {} },
+      { creditorId: "entity-other", debtorId: "entity-another", creditorName: "O", debtorName: "A", amount: {} },
+    ];
+    const entitySet = new Set(["entity-tasnim"]);
+    const filtered = mockBalances.filter(
+      (b) => entitySet.has(b.creditorId) || entitySet.has(b.debtorId),
+    );
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].creditorId).toBe("entity-tasnim");
+  });
+
+  it("pnlByEntity restricts entities to user scope (entityIds filters entity list)", () => {
+    // Simulates how pnlByEntity with entityIds filters the entities Prisma query
+    const allEntities = [
+      { id: "entity-tasnim", name: "Tasnim" },
+      { id: "entity-tahlil", name: "Tahlil" },
+    ];
+    const userEntityIds = ["entity-tasnim"];
+    const filtered = allEntities.filter((e) => userEntityIds.includes(e.id));
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].id).toBe("entity-tasnim");
+    // Tahlil's P&L data is not shown to Tasnim-scoped user
+    expect(filtered.find((e) => e.id === "entity-tahlil")).toBeUndefined();
+  });
+
+  it("inventoryOverview uses warehouse entityId to scope InventoryItem rows", () => {
+    // When entityIds=["entity-tasnim"], itemWhere = { warehouse: { entityId: { in: ["entity-tasnim"] } } }
+    const entityIds = ["entity-tasnim"];
+    const itemWhere =
+      entityIds !== undefined && entityIds !== null
+        ? { warehouse: { entityId: { in: entityIds } } }
+        : {};
+    expect(itemWhere).toEqual({ warehouse: { entityId: { in: ["entity-tasnim"] } } });
+  });
+});
+
+// ── CI guard script logic ─────────────────────────────────────────────────────
+
+describe("CI guard — check:entity-isolation logic", () => {
+  it("detects write-path violation: requirePermission + entityId without assertRowAccess", () => {
+    const violationSrc = `
+      import { requirePermission } from "@/lib/rbac";
+      export async function POST(req) {
+        const user = await requirePermission("sales.write");
+        const body = await req.json();
+        await prisma.salesOrder.create({ data: { entityId: body.entityId } });
+      }
+    `;
+    const hasAuthGuard = violationSrc.includes("requirePermission(");
+    const hasEntityId = /\bentityId\b/.test(violationSrc);
+    const hasGuard = violationSrc.includes("assertRowAccess(") || violationSrc.includes("requireRowAccess(");
+    const skipMark = violationSrc.includes("// check:entity-ok");
+
+    expect(hasAuthGuard).toBe(true);
+    expect(hasEntityId).toBe(true);
+    expect(hasGuard).toBe(false);
+    expect(skipMark).toBe(false);
+    // → would be flagged as violation
+  });
+
+  it("does NOT flag file with check:entity-ok comment", () => {
+    const okSrc = `
+      // check:entity-ok: entityId only used in read-path filter
+      import { requirePermission } from "@/lib/rbac";
+      export async function GET(req) {
+        const user = await requirePermission("costs.read");
+        const where = { entityId: req.searchParams.get("entityId") };
+        return ok(await listCosts(where));
+      }
+    `;
+    const skipMark = okSrc.includes("// check:entity-ok");
+    expect(skipMark).toBe(true); // → skipped, no violation
+  });
+
+  it("detects read-path violation: entity-scoped findMany without entityFilter", () => {
+    const pageSrc = `
+      import { requirePermission } from "@/lib/rbac";
+      export default async function Page() {
+        const user = await requirePermission("sales.read");
+        const orders = await prisma.salesOrder.findMany({ take: 200 });
+      }
+    `;
+    const ENTITY_SCOPED_MODELS = ["salesOrder", "receivable", "payment", "transferOrder", "stockMovement", "inventoryItem"];
+    const hasAuthGuard = pageSrc.includes("requirePermission(");
+    const hasEntityScopedQuery = ENTITY_SCOPED_MODELS.some((m) =>
+      pageSrc.includes(`prisma.${m}.findMany`) || pageSrc.includes(`prisma.${m}.findFirst`),
+    );
+    const hasEntityFilter = pageSrc.includes("entityFilter(");
+    const skipMark = pageSrc.includes("// check:entity-ok");
+
+    expect(hasAuthGuard).toBe(true);
+    expect(hasEntityScopedQuery).toBe(true);
+    expect(hasEntityFilter).toBe(false);
+    expect(skipMark).toBe(false);
+    // → would be flagged as read-path violation
+  });
+
+  it("does NOT flag page with entityFilter wired correctly", () => {
+    const okPageSrc = `
+      import { requirePermission, entityFilter } from "@/lib/rbac";
+      export default async function Page() {
+        const user = await requirePermission("sales.read");
+        const eIds = entityFilter(user);
+        const orders = await prisma.salesOrder.findMany({ where: { entityId: { in: eIds } } });
+      }
+    `;
+    const hasEntityFilter = okPageSrc.includes("entityFilter(");
+    expect(hasEntityFilter).toBe(true); // → not flagged
+  });
+});

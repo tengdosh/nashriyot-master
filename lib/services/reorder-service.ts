@@ -210,7 +210,7 @@ export async function recalcAbc(
 }
 
 /** Per-SKU rows for the /inventory table (QoH / Reserved / Available / On Order / status). */
-export async function inventoryOverview(now: Date = new Date()) {
+export async function inventoryOverview(now: Date = new Date(), entityIds?: string[] | null) {
   const cfg = await getInventorySettings();
   const products = await prisma.product.findMany({
     where: { archivedAt: null },
@@ -226,12 +226,17 @@ export async function inventoryOverview(now: Date = new Date()) {
     orderBy: { createdAt: "desc" },
   });
 
+  const itemWhere =
+    entityIds !== undefined && entityIds !== null
+      ? { warehouse: { entityId: { in: entityIds } } }
+      : {};
+
   return Promise.all(
     products.map(async (p) => {
       const [r, items] = await Promise.all([
         ropForProduct(p, cfg, now),
         prisma.inventoryItem.findMany({
-          where: { productId: p.id },
+          where: { productId: p.id, ...itemWhere },
           include: { warehouse: { select: { id: true, name: true, type: true } } },
         }),
       ]);

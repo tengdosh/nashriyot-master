@@ -36,22 +36,29 @@ export type FinanceOverview = {
   weekly: { week: string; in: Prisma.Decimal; out: Prisma.Decimal; net: Prisma.Decimal }[];
 };
 
-export async function financeOverview(now: Date = new Date()): Promise<FinanceOverview> {
+export async function financeOverview(now: Date = new Date(), entityIds?: string[] | null): Promise<FinanceOverview> {
+  const eWhere = entityIds !== undefined && entityIds !== null ? { entityId: { in: entityIds } } : {};
+  const entitiesWhere =
+    entityIds !== undefined && entityIds !== null
+      ? { archivedAt: null, id: { in: entityIds } }
+      : { archivedAt: null };
+
   const [payments, entities, receivables, payables, ledger] = await Promise.all([
     prisma.payment.findMany({
+      where: eWhere,
       select: { entityId: true, direction: true, amount: true, date: true },
       orderBy: { date: "asc" },
     }),
-    prisma.entity.findMany({ where: { archivedAt: null }, select: { id: true, name: true } }),
+    prisma.entity.findMany({ where: entitiesWhere, select: { id: true, name: true } }),
     prisma.receivable.findMany({
-      where: { status: { in: ["OPEN", "PARTIAL"] } },
+      where: { status: { in: ["OPEN", "PARTIAL"] }, ...eWhere },
       select: { amountUZS: true, paidUZS: true },
     }),
     prisma.payable.findMany({
       where: { status: { in: ["OPEN", "PARTIAL"] } },
       select: { amountUZS: true, paidUZS: true },
     }),
-    entityLedger(),
+    entityLedger(entityIds),
   ]);
 
   const rows = payments.map((p) => ({
@@ -281,9 +288,13 @@ export type ReconReport = {
 export async function reconciliation(
   bank: BankRow[] = [],
   opts: { days?: number; amountTol?: Prisma.Decimal.Value } = {},
+  entityIds?: string[] | null,
 ): Promise<ReconReport> {
   const rows = await prisma.payment.findMany({
-    where: { reconStatus: "PENDING" },
+    where: {
+      reconStatus: "PENDING",
+      ...(entityIds !== undefined && entityIds !== null ? { entityId: { in: entityIds } } : {}),
+    },
     include: {
       entity: { select: { name: true } },
       partner: { select: { name: true } },

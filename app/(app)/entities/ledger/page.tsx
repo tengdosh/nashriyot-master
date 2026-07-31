@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { entityLedger } from "@/lib/services/transfer-service";
 import { Button } from "@/components/ui/button";
 import { KpiCard } from "@/components/shared/kpi-card";
@@ -13,8 +13,9 @@ export const metadata = { title: "Ichki ledger" };
 
 export default async function EntityLedgerPage() {
   const user = await requirePermission("transfers.read");
+  const eIds = entityFilter(user);
   const [balances, entities, settlements] = await Promise.all([
-    entityLedger(),
+    entityLedger(eIds),
     prisma.entity.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { code: "asc" } }),
     prisma.entitySettlement.findMany({
       include: { fromEntity: { select: { name: true } }, toEntity: { select: { name: true } } },

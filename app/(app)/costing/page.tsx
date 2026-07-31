@@ -1,3 +1,4 @@
+// check:entity-ok: primary model has no entityId — this module is company-wide
 import { requirePermission } from "@/lib/rbac";
 import { costingTable } from "@/lib/services/costing-service";
 import { InfoHint } from "@/components/shared/info-hint";

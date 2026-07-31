@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Scale } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { listTransfers } from "@/lib/services/transfer-service";
 import { Button } from "@/components/ui/button";
 import { TransfersClient, type TransferRow, type TransferRefs } from "./transfers-client";
@@ -10,9 +10,10 @@ export const metadata = { title: "Transferlar" };
 
 export default async function TransfersPage() {
   const user = await requirePermission("transfers.read");
+  const eIds = entityFilter(user);
 
   const [transfers, entities, warehouses, products] = await Promise.all([
-    listTransfers(200, user.entityAccess ?? []),
+    listTransfers(200, eIds),
     prisma.entity.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { code: "asc" } }),
     prisma.warehouse.findMany({ where: { archivedAt: null, type: { not: "AGENT" } }, select: { id: true, name: true, entityId: true }, orderBy: { name: "asc" } }),
     prisma.product.findMany({

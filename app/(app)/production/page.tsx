@@ -1,3 +1,4 @@
+// check:entity-ok: primary model has no entityId — this module is company-wide
 import Link from "next/link";
 import { Printer } from "lucide-react";
 import { prisma } from "@/lib/db";

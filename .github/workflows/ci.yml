@@ -60,6 +60,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Entity isolation check
+        run: npm run check:entity
+
       - name: Unit tests
         run: npm run test:unit
 

@@ -255,7 +255,7 @@ export async function forecastAccuracy() {
  * royalty from SENT royalty statements whose title belongs to the entity; FIXED
  * costs from cost_entries. The engine (lib/analytics.pnlRollup) adds the Jami row.
  */
-export async function pnlByEntity(from: string, to: string) {
+export async function pnlByEntity(from: string, to: string, entityIds?: string[] | null) {
   const [sales, royalties, fixed, entities] = await Promise.all([
     prisma.$queryRaw<{ entityId: string; net_revenue: string; cogs: string }[]>`
       SELECT "entityId", SUM(net_revenue)::text AS net_revenue, SUM(cogs)::text AS cogs
@@ -281,7 +281,14 @@ export async function pnlByEntity(from: string, to: string) {
         AND to_char(date, 'YYYY-MM') >= ${from} AND to_char(date, 'YYYY-MM') <= ${to}
       GROUP BY "entityId"
     `,
-    prisma.entity.findMany({ where: { archivedAt: null }, select: { id: true, name: true }, orderBy: { code: "asc" } }),
+    prisma.entity.findMany({
+      where:
+        entityIds !== undefined && entityIds !== null
+          ? { archivedAt: null, id: { in: entityIds } }
+          : { archivedAt: null },
+      select: { id: true, name: true },
+      orderBy: { code: "asc" },
+    }),
   ]);
 
   const salesBy = new Map(sales.map((s) => [s.entityId, s]));

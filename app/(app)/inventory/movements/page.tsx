@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { Button } from "@/components/ui/button";
 import { MovementsTable, type MovementRow } from "./movements-client";
 
 export const metadata = { title: "Ombor harakatlari" };
 
 export default async function MovementsPage() {
-  await requirePermission("inventory.read");
+  const user = await requirePermission("inventory.read");
+  const eIds = entityFilter(user);
+  const entityWhere = eIds !== null ? { warehouse: { entityId: { in: eIds } } } : {};
 
   const movements = await prisma.stockMovement.findMany({
+    where: entityWhere,
     include: {
       product: { select: { sku: true, title: { select: { workTitle: true } } } },
       warehouse: { select: { name: true, type: true } },

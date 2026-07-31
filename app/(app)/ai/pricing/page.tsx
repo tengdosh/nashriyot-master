@@ -1,3 +1,4 @@
+// check:entity-ok: primary model has no entityId — this module is company-wide
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requirePermission } from "@/lib/rbac";

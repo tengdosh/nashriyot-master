@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * CI guard: flag action/route files that use entityId in an auth-guarded context
- * but do not call assertRowAccess or requireRowAccess.
+ * CI guard — two checks in one script:
  *
- * Scans:
- *   app/**\/actions.ts   — Server Action files
- *   app/api/v1\/**\/route.ts — REST API route files
+ * CHECK 1 (write paths): action/route files that use entityId in an auth-guarded
+ * context but do not call assertRowAccess / requireRowAccess.
+ *   Scans: app/**\/actions.ts, app/api/v1\/**\/route.ts
+ *
+ * CHECK 2 (read paths): page.tsx files that directly query entity-scoped Prisma
+ * models (SalesOrder, Receivable, Payment, TransferOrder, StockMovement,
+ * InventoryItem) without calling entityFilter().
+ *   Scans: app\/**\/page.tsx
+ *
+ * Opt-out: add `// check:entity-ok: <reason>` to files where the check is a
+ * known false-positive (read-only entityId, company-wide model, etc.).
  *
  * Exit 0 = all clear   Exit 1 = violations found
  */
@@ -40,18 +47,17 @@ function findFiles(dir, matcher) {
   return results;
 }
 
-const targets = [
+// ── CHECK 1: write paths (actions.ts + route.ts) ─────────────────────────────
+
+const writePaths = [
   ...findFiles(join(ROOT, "app"), (name) => name === "actions.ts"),
   ...findFiles(join(ROOT, "app", "api", "v1"), (name) => name === "route.ts"),
 ];
 
 const violations = [];
 
-for (const file of targets) {
+for (const file of writePaths) {
   const src = readFileSync(file, "utf8");
-
-  // Explicit opt-out: add `// check:entity-ok: <reason>` to files where entityId
-  // usage is read-only (filter/select) and assertRowAccess is not applicable.
   if (src.includes("// check:entity-ok")) continue;
 
   const hasAuthGuard = src.includes("requirePermission(");
@@ -64,21 +70,55 @@ for (const file of targets) {
     src.includes("assertRowAccess(") || src.includes("requireRowAccess(");
   if (hasGuard) continue;
 
-  violations.push(file.replace(ROOT, ""));
+  violations.push(`${file.replace(ROOT, "")}  [write: entityId without assertRowAccess]`);
 }
 
+// ── CHECK 2: read paths (page.tsx) ───────────────────────────────────────────
+
+// Models whose rows are scoped per entity — a findMany without entityFilter is a leak.
+const ENTITY_SCOPED_MODELS = [
+  "salesOrder",
+  "receivable",
+  "payment",
+  "transferOrder",
+  "stockMovement",
+  "inventoryItem",
+];
+
+const pagePaths = findFiles(join(ROOT, "app"), (name) => name === "page.tsx");
+
+for (const file of pagePaths) {
+  const src = readFileSync(file, "utf8");
+  if (src.includes("// check:entity-ok")) continue;
+
+  const hasAuthGuard = src.includes("requirePermission(");
+  if (!hasAuthGuard) continue;
+
+  // Does this page query an entity-scoped model directly?
+  const hasEntityScopedQuery = ENTITY_SCOPED_MODELS.some(
+    (m) => src.includes(`prisma.${m}.findMany`) || src.includes(`prisma.${m}.findFirst`),
+  );
+  if (!hasEntityScopedQuery) continue;
+
+  const hasEntityFilter = src.includes("entityFilter(");
+  if (hasEntityFilter) continue;
+
+  violations.push(`${file.replace(ROOT, "")}  [read: entity-scoped findMany without entityFilter]`);
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+
 if (violations.length === 0) {
-  console.log("check:entity — OK: all entity-aware write paths are guarded");
+  console.log("check:entity — OK: all entity-aware write and read paths are guarded");
   process.exit(0);
 } else {
-  console.error(
-    "check:entity — FAIL: the following files use entityId without assertRowAccess/requireRowAccess:\n"
-  );
+  console.error("check:entity — FAIL: entity isolation violations found:\n");
   for (const v of violations) {
     console.error(`  ✗  ${v}`);
   }
   console.error(
-    "\nEach entity-scoped write MUST call assertRowAccess(user, { entityId }) before touching the DB."
+    "\nWrite paths: add assertRowAccess(user, { entityId }) before any DB mutation." +
+    "\nRead paths:  add entityFilter(user) and pass to service/query, or add // check:entity-ok if company-wide.",
   );
   process.exit(1);
 }
