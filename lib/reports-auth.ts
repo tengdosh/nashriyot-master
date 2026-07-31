@@ -1,3 +1,4 @@
+import { timingSafeEqual as cryptoTimingSafeEqual, createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ReportError, type ReportCaller } from "@/lib/services/reports-service";
@@ -21,12 +22,12 @@ export function hasValidServiceToken(req: NextRequest): boolean {
   return m != null && timingSafeEqual(m[1], expected);
 }
 
-// Constant-time-ish compare so a wrong token can't be guessed by timing.
+// T-25: hash both sides to equal length before constant-time compare so the
+// check doesn't leak token length via a short-circuit return.
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return cryptoTimingSafeEqual(ha, hb);
 }
 
 /** Load a user's permissions + entity access by id (bot path). */

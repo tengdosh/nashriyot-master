@@ -300,6 +300,27 @@ dashboard notifications, and 18 months of FIXED cost_entries (Jul-2025+ rent
 (5533)** — the live deployment shows real numbers across every module. Run it
 again anytime to reset the demo world.
 
+- **Every new service function that writes to a table shared across entities MUST
+  start with `requireRowAccess`/`assertRowAccess(user, { entityId })`.** Read
+  paths: pass `entityIds` from `accessibleEntityIds(user)` into the Prisma
+  `where` clause. There are no exceptions — the check is the first line of the
+  function body, before any DB read. (Pinned 2026-07-31: T-22 found 0 call
+  sites; e072fed wired all write paths.)
+- **`StockMovementType` is selected through a single helper, never inline.**
+  Sales = `"OUT"`, transfers = `"TRANSFER"`, write-offs = `"ADJUST"`,
+  consignment moves = `"TRANSFER"`. `LAYER_TYPES = ["IN","RETURN"]` are the
+  only consumable layers. A new path that incorrectly uses `"OUT"` for an
+  inter-entity move will inflate Sotilgan and ABC revenue — which is exactly
+  what T-02 caused. Use `fifoIssue(tx, { type: "TRANSFER", ... })` for
+  inter-entity; let the default (`"OUT"`) fire only for genuine customer sales.
+- **Fallback/default secrets are forbidden.** `AUTH_SECRET`, `REPORTS_API_TOKEN`,
+  and similar env vars must never have a hardcoded string fallback (`?? "dev-…"`).
+  The service MUST throw on missing env so the misconfiguration is caught at
+  startup, not silently promoted to a weak security boundary. Token comparisons
+  must use `crypto.timingSafeEqual` on hash-equalised buffers (not a hand-rolled
+  XOR loop) so a wrong token cannot be guessed by response timing. (Pinned
+  2026-07-31: T-27 removed two fallbacks; T-25 fixed length-leaking comparison.)
+
 ## Local dev notes (this environment)
 - Node 22 (NodeSource) + npm. Prisma pinned to **6.x** (classic
   `prisma-client-js`; import `{ PrismaClient } from "@prisma/client"`).
