@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { titleUniqueCost } from "@/lib/services/edition-service";
 import { TITLE_FLOW, isBackward } from "@/lib/services/title-service";
 import { TitleDetail } from "./title-detail";
@@ -28,6 +28,8 @@ export default async function TitlePage({ params }: { params: Promise<{ id: stri
     },
   });
   if (!title) notFound();
+  const eIds = entityFilter(user);
+  if (eIds !== null && title.entityId && !eIds.includes(title.entityId)) notFound();
 
   const [uniqueCost, audit] = await Promise.all([
     titleUniqueCost(id),

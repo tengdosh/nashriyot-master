@@ -451,3 +451,131 @@ describe("CI guard — check:entity-isolation logic", () => {
     expect(hasEntityFilter).toBe(true); // → not flagged
   });
 });
+
+// ── T-23b: Detail page entity isolation ──────────────────────────────────────
+
+describe("T-23b — detail page entityFilter gate (notFound pattern)", () => {
+  it("sales/orders/[id]: Tahlil order → notFound for ent-sotuv user", () => {
+    // Simulates the gate added to sales/orders/[id]/page.tsx:
+    // const eIds = entityFilter(user);
+    // if (eIds !== null && !eIds.includes(data.order.entityId)) notFound();
+    const user = { ...TASNIM_USER, entityAccess: ["ent-sotuv"] };
+    const eIds = entityFilter(user);
+    const orderEntityId = "ent-tahlil";
+    const blocked = eIds !== null && !eIds.includes(orderEntityId);
+    expect(eIds).toEqual(["ent-sotuv"]);
+    expect(blocked).toBe(true); // notFound() would be called
+  });
+
+  it("sales/orders/[id]: own entity order → passes gate", () => {
+    const user = { ...TASNIM_USER, entityAccess: ["ent-sotuv"] };
+    const eIds = entityFilter(user);
+    const orderEntityId = "ent-sotuv";
+    const blocked = eIds !== null && !eIds.includes(orderEntityId);
+    expect(blocked).toBe(false); // page renders normally
+  });
+
+  it("titles/[id]: Tahlil title → notFound for Tasnim user", () => {
+    const eIds = entityFilter(TASNIM_USER);
+    const titleEntityId = "ent-tahlil";
+    // nullable check: entityId && !eIds.includes(entityId)
+    const blocked = eIds !== null && !!titleEntityId && !eIds.includes(titleEntityId);
+    expect(blocked).toBe(true);
+  });
+
+  it("titles/[id]: title with entityId=null (external) → passes for any entity-bound user", () => {
+    const eIds = entityFilter(TASNIM_USER);
+    const titleEntityId: string | null = null;
+    // null entityId → company-wide title, not entity-scoped
+    const blocked = eIds !== null && !!titleEntityId && !eIds.includes(titleEntityId ?? "");
+    expect(blocked).toBe(false); // null entityId → unrestricted
+  });
+
+  it("costing/[id]: Tahlil product → notFound via product.title.entityId", () => {
+    const eIds = entityFilter(TASNIM_USER);
+    const productTitleEntityId = "ent-tahlil";
+    const blocked = eIds !== null && !!productTitleEntityId && !eIds.includes(productTitleEntityId);
+    expect(blocked).toBe(true);
+  });
+
+  it("acquisitions/[id]: scenario linked to Tahlil title → notFound", () => {
+    const eIds = entityFilter(TASNIM_USER);
+    // s.titleId set → fetch title.entityId → check
+    const linkedEntityId = "ent-tahlil";
+    const blocked = eIds !== null && !!linkedEntityId && !eIds.includes(linkedEntityId);
+    expect(blocked).toBe(true);
+  });
+
+  it("acquisitions/[id]: scenario with no titleId → passes (not yet entity-linked)", () => {
+    const eIds = entityFilter(TASNIM_USER);
+    const titleId: string | null = null;
+    // if (!s.titleId) skip the check
+    const checked = !!titleId;
+    expect(checked).toBe(false); // no titleId → no entity check → page renders
+  });
+
+  it("director (admin) is never blocked on any detail page", () => {
+    const admin = { id: "u-dir", permissions: ["admin.settings"], roles: ["DIRECTOR"], entityAccess: [] };
+    const eIds = entityFilter(admin);
+    expect(eIds).toBeNull(); // null → no gate applied, any entityId passes
+    const blocked = eIds !== null && !["ent-tahlil"].includes("ent-tahlil");
+    expect(blocked).toBe(false);
+  });
+});
+
+// ── CHECK 3 CI guard logic ────────────────────────────────────────────────────
+
+describe("CI guard CHECK 3 — detail page findUnique without assertRowAccess", () => {
+  const MODELS_DETAIL = [
+    "salesOrder", "receivable", "payment", "transferOrder",
+    "stockMovement", "inventoryItem", "title",
+  ];
+
+  it("flags page with title.findUnique and no entityFilter or assertRowAccess", () => {
+    const src = `
+      import { requirePermission } from "@/lib/rbac";
+      import { prisma } from "@/lib/db";
+      export default async function Page({ params }) {
+        const user = await requirePermission("titles.read");
+        const title = await prisma.title.findUnique({ where: { id: params.id } });
+      }
+    `;
+    const hasDetailQuery = MODELS_DETAIL.some(
+      (m) => src.includes(`prisma.${m}.findUnique`) ||
+              src.includes(`prisma.${m}.findFirst`) ||
+              src.includes(`prisma.${m}.findUniqueOrThrow`),
+    );
+    const hasRowGuard = src.includes("assertRowAccess(") || src.includes("entityFilter(");
+    expect(hasDetailQuery).toBe(true);
+    expect(hasRowGuard).toBe(false);
+    // → would be flagged by CHECK 3
+  });
+
+  it("does NOT flag page with salesOrder.findUnique + entityFilter", () => {
+    const src = `
+      import { requirePermission, entityFilter } from "@/lib/rbac";
+      import { prisma } from "@/lib/db";
+      export default async function Page({ params }) {
+        const user = await requirePermission("sales.read");
+        const order = await prisma.salesOrder.findUnique({ where: { id: params.id } });
+        const eIds = entityFilter(user);
+        if (eIds !== null && !eIds.includes(order.entityId)) notFound();
+      }
+    `;
+    const hasRowGuard = src.includes("entityFilter(");
+    expect(hasRowGuard).toBe(true); // → CHECK 3 satisfied, not flagged
+  });
+
+  it("does NOT flag page with check:entity-ok comment", () => {
+    const src = `
+      // check:entity-ok: RoyaltyRun is company-wide
+      import { requirePermission } from "@/lib/rbac";
+      export default async function Page() {
+        await requirePermission("royalty.read");
+        const run = await prisma.royaltyRun.findUnique({ where: {} });
+      }
+    `;
+    const skipMark = src.includes("// check:entity-ok");
+    expect(skipMark).toBe(true); // → skipped, no violation
+  });
+});

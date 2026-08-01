@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { ScenarioEditor } from "../scenario-editor";
 
 export default async function ScenarioPage({ params }: { params: Promise<{ id: string }> }) {
@@ -8,6 +8,12 @@ export default async function ScenarioPage({ params }: { params: Promise<{ id: s
   const { id } = await params;
   const s = await prisma.plScenario.findUnique({ where: { id } });
   if (!s) notFound();
+
+  if (s.titleId) {
+    const linked = await prisma.title.findUnique({ where: { id: s.titleId }, select: { entityId: true } });
+    const eIds = entityFilter(user);
+    if (eIds !== null && linked?.entityId && !eIds.includes(linked.entityId)) notFound();
+  }
 
   const titles = await prisma.title.findMany({
     where: { archivedAt: null, OR: [{ entityId: { in: user.entityAccess } }, { entityId: null }] },

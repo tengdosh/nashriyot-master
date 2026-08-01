@@ -1,3 +1,4 @@
+// check:entity-ok: RoyaltyRun is company-wide — one run per period covers all entities/contracts
 /**
  * Print-ready royalty statement — no nav, clean layout, @media print CSS.
  * Route: /royalties/runs/[id]/print

@@ -1,3 +1,4 @@
+// check:entity-ok: RoyaltyRun is company-wide — one run per period covers all entities/contracts
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Printer } from "lucide-react";

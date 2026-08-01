@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { getSalesOrder } from "@/lib/services/sales-service";
 import { Button } from "@/components/ui/button";
 import { OrderCard, type OrderCardLine } from "./order-card";
@@ -18,6 +18,9 @@ export default async function SalesOrderPage({ params }: { params: Promise<{ id:
   } catch {
     notFound();
   }
+
+  const eIds = entityFilter(user);
+  if (eIds !== null && !eIds.includes(data.order.entityId)) notFound();
 
   const { order, lines, totals } = data;
 

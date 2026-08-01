@@ -270,7 +270,7 @@ export async function costingTable() {
 export async function costingDetail(productId: string) {
   const product = await prisma.product.findUniqueOrThrow({
     where: { id: productId },
-    select: { id: true, sku: true, listPrice: true, titleId: true, title: { select: { workTitle: true } } },
+    select: { id: true, sku: true, listPrice: true, titleId: true, title: { select: { workTitle: true, entityId: true } } },
   });
   const [history, unique, printUnit] = await Promise.all([
     prisma.dailyUnitCost.findMany({ where: { productId }, orderBy: { date: "asc" }, take: 180 }),

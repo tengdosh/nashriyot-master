@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, assertRowAccess } from "@/lib/rbac";
 import { generateOnix } from "@/lib/onix";
 import { handleError } from "@/lib/api-response";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermission("titles.read");
+    const user = await requirePermission("titles.read");
     const { id } = await params;
     const title = await prisma.title.findUniqueOrThrow({
       where: { id },
@@ -17,6 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         ownerPartner: true,
       },
     });
+    assertRowAccess(user, { entityId: title.entityId });
     const product = title.products[0];
     const xml = generateOnix({
       isbn13: product?.isbn13 ?? null,

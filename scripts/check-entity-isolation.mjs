@@ -106,6 +106,44 @@ for (const file of pagePaths) {
   violations.push(`${file.replace(ROOT, "")}  [read: entity-scoped findMany without entityFilter]`);
 }
 
+// ── CHECK 3: read paths — detail pages (findUnique/findFirst without guard) ───
+//
+// An auth-guarded page.tsx that calls findUnique/findFirst/findUniqueOrThrow on
+// an entity-scoped model MUST have either assertRowAccess() or entityFilter()
+// to prevent IDOR via direct URL.  The same ENTITY_SCOPED_MODELS list applies,
+// plus `title` which has a direct entityId.
+//
+// Opt-out: // check:entity-ok  (same as other checks)
+
+const ENTITY_SCOPED_MODELS_DETAIL = [
+  ...ENTITY_SCOPED_MODELS,
+  "title", // Title.entityId — direct, nullable
+];
+
+for (const file of pagePaths) {
+  const src = readFileSync(file, "utf8");
+  if (src.includes("// check:entity-ok")) continue;
+
+  const hasAuthGuard = src.includes("requirePermission(");
+  if (!hasAuthGuard) continue;
+
+  const hasDetailQuery = ENTITY_SCOPED_MODELS_DETAIL.some(
+    (m) =>
+      src.includes(`prisma.${m}.findUnique`) ||
+      src.includes(`prisma.${m}.findFirst`) ||
+      src.includes(`prisma.${m}.findUniqueOrThrow`),
+  );
+  if (!hasDetailQuery) continue;
+
+  const hasRowGuard =
+    src.includes("assertRowAccess(") ||
+    src.includes("requireRowAccess(") ||
+    src.includes("entityFilter(");
+  if (hasRowGuard) continue;
+
+  violations.push(`${file.replace(ROOT, "")}  [detail: entity-scoped findUnique/findFirst without assertRowAccess or entityFilter]`);
+}
+
 // ── Report ────────────────────────────────────────────────────────────────────
 
 if (violations.length === 0) {

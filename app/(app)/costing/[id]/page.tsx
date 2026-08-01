@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, entityFilter } from "@/lib/rbac";
 import { costingDetail } from "@/lib/services/costing-service";
 import { Button } from "@/components/ui/button";
 import { CostingDetail, type DetailView } from "./costing-detail";
@@ -10,7 +10,7 @@ export const metadata = { title: "Tan narx — SKU" };
 
 export default async function CostingSkuPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requirePermission("costing.read");
+  const user = await requirePermission("costing.read");
 
   let data: Awaited<ReturnType<typeof costingDetail>>;
   try {
@@ -18,6 +18,9 @@ export default async function CostingSkuPage({ params }: { params: Promise<{ id:
   } catch {
     notFound();
   }
+
+  const eIds = entityFilter(user);
+  if (eIds !== null && data.product.title.entityId && !eIds.includes(data.product.title.entityId)) notFound();
 
   const view: DetailView = {
     workTitle: data.product.title.workTitle,
